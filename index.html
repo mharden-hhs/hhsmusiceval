@@ -2131,33 +2131,39 @@ async function sendReportEmail(){
   <div class="wrap">${reportHtml}</div>
   </body></html>`;
 
-  // Build RFC 2822 message
+  // Build RFC 2822 MIME message with properly encoded HTML body
   const m = getFormMeta();
   const teacherField = config.metaFields.find(f=>f.id==='teacherName');
-  const teacher = teacherField&&m[teacherField.id] ? m[teacherField.id] : 'Guitar Teacher';
 
-  // Encode subject with RFC 2047 encoded-word syntax to handle special chars like em-dash
+  // Encode subject with RFC 2047 to handle any special characters
   const encodedSubject = '=?UTF-8?B?' + btoa(unescape(encodeURIComponent(subject))) + '?=';
 
-  const headers = [
+  // Base64url encode the HTML body using TextEncoder for correct UTF-8
+  const bodyBytes = new TextEncoder().encode(emailBody);
+  // Convert Uint8Array to base64 in chunks to avoid call stack overflow
+  let binary = '';
+  const chunkSize = 8192;
+  for(let i=0; i<bodyBytes.length; i+=chunkSize){
+    binary += String.fromCharCode(...bodyBytes.subarray(i, i+chunkSize));
+  }
+  const bodyB64 = btoa(binary);
+  // Split into 76-char lines as required by MIME spec
+  const bodyB64Lines = bodyB64.match(/.{1,76}/g).join('\r\n');
+
+  const msgLines = [
+    `MIME-Version: 1.0`,
+    `From: ${signedInEmail}`,
     `To: ${toEmail}`,
     ccTeacher && signedInEmail ? `Cc: ${signedInEmail}` : null,
-    `From: ${signedInEmail}`,
     `Subject: ${encodedSubject}`,
-    `MIME-Version: 1.0`,
     `Content-Type: text/html; charset=UTF-8`,
     `Content-Transfer-Encoding: base64`,
-    ``
+    ``,
+    bodyB64Lines
   ].filter(v=>v!==null).join('\r\n');
 
-  // Encode the HTML body separately as base64
-  const bodyBytes = new TextEncoder().encode(emailBody);
-  const bodyB64 = btoa(String.fromCharCode(...bodyBytes))
-    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-
-  // Encode the full raw message (headers + body)
-  const rawMessage = headers + '\r\n' + bodyB64;
-  const encoded = btoa(unescape(encodeURIComponent(rawMessage)))
+  // Base64url encode the entire raw message for the Gmail API
+  const encoded = btoa(unescape(encodeURIComponent(msgLines)))
     .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 
   try{
