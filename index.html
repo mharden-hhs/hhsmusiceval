@@ -296,7 +296,14 @@ body{background:var(--light);font-family:'Lato',sans-serif;margin:0;padding:0;}
 <body>
 
 <!-- CONFIG BANNER -->
-<div id="configBanner" style="display:none;"></div>
+<div id="configBanner" style="display:none;background:#e8f4fd;border-bottom:2px solid #90caf9;padding:8px 18px;font-size:13px;align-items:center;gap:10px;flex-wrap:wrap;">
+  <i class="fab fa-google" style="color:#1a73e8;font-size:15px;"></i>
+  <span style="color:#1a5276;">Sign in with your school Google account to enable Drive sync, shared sheet access, and email reports.</span>
+  <button class="btn btn-sm" onclick="signIn()" style="background:#1a73e8;color:white;padding:3px 12px;font-size:12px;border-radius:6px;">
+    <i class="fab fa-google" style="margin-right:4px;"></i>Sign in
+  </button>
+  <button onclick="document.getElementById('configBanner').style.display='none'" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;margin-left:auto;line-height:1;">×</button>
+</div>
 
 <!-- HEADER -->
 <div class="app-header">
@@ -1747,39 +1754,71 @@ function resetAllConfig(){
 
 /* ═══ CONFIG SHEET SYNC ════════════════════════════════════════ */
 async function pushConfigToSheet(){
-  const sheetId=config.driveSettings.configSheetId;
-  if(!sheetId){toast('No config sheet ID set','fas fa-triangle-exclamation','#f39c12');return;}
-  if(!accessToken){toast('Not signed in to Drive','fas fa-triangle-exclamation','#e74c3c');return;}
+  // Read directly from the input field so admin doesn't need to hit Save first
+  const inputEl = document.getElementById('adminConfigSheetId');
+  const sheetId = (inputEl ? inputEl.value.trim() : '') || config.driveSettings.configSheetId;
+  if(!sheetId){ toast('Enter a Config Sheet ID first','fas fa-triangle-exclamation','#f39c12'); return; }
+  if(!accessToken){ toast('Not signed in to Drive','fas fa-triangle-exclamation','#e74c3c'); return; }
+  setStatus('Pushing config...','busy');
   try{
-    const configJson=JSON.stringify(config);
-    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Config!A1?valueInputOption=USER_ENTERED`,{
-      method:'PUT',
-      headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-      body:JSON.stringify({range:'Config!A1',majorDimension:'ROWS',values:[['guitar_assessment_config'],[configJson]]})
-    });
+    // Ensure the Config tab exists — creates it with header if missing
+    await ensureTab(sheetId, 'Config');
+    const configJson = JSON.stringify(config);
+    const resp = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent('Config!A1')}?valueInputOption=USER_ENTERED`,
+      {
+        method:'PUT',
+        headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+        body:JSON.stringify({
+          range:'Config!A1',
+          majorDimension:'ROWS',
+          values:[['guitar_assessment_config'],[configJson]]
+        })
+      }
+    );
+    const result = await resp.json();
+    if(result.error) throw new Error(result.error.message);
+    // Persist the sheet ID into config if it wasn't already saved
+    config.driveSettings.configSheetId = sheetId;
+    saveConfig();
+    setStatus('Saved','ok');
     toast('Config pushed to Google Sheet','fas fa-upload','#27ae60');
-  }catch(e){toast('Push failed: '+(e.message||e),'fas fa-triangle-exclamation','#e74c3c');}
+  }catch(e){
+    setStatus('Error','');
+    toast('Push failed: '+(e.message||e),'fas fa-triangle-exclamation','#e74c3c');
+    console.error('pushConfigToSheet error',e);
+  }
 }
 async function pullConfigFromSheet(){
-  const sheetId=config.driveSettings.configSheetId;
-  if(!sheetId){toast('No config sheet ID set','fas fa-triangle-exclamation','#f39c12');return;}
-  if(!accessToken){toast('Not signed in to Drive','fas fa-triangle-exclamation','#e74c3c');return;}
+  const inputEl = document.getElementById('adminConfigSheetId');
+  const sheetId = (inputEl ? inputEl.value.trim() : '') || config.driveSettings.configSheetId;
+  if(!sheetId){ toast('Enter a Config Sheet ID first','fas fa-triangle-exclamation','#f39c12'); return; }
+  if(!accessToken){ toast('Not signed in to Drive','fas fa-triangle-exclamation','#e74c3c'); return; }
+  setStatus('Pulling config...','busy');
   try{
-    const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Config!A2`,{
-      headers:{Authorization:'Bearer '+accessToken}
-    });
+    const r=await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent('Config!A2')}`,
+      {headers:{Authorization:'Bearer '+accessToken}}
+    );
     const data=await r.json();
+    if(data.error) throw new Error(data.error.message);
     const raw=data.values&&data.values[0]&&data.values[0][0];
-    if(!raw)throw new Error('No config data found');
+    if(!raw) throw new Error('No config data found in Config tab — push first');
     config=JSON.parse(raw);
+    config.driveSettings.configSheetId = sheetId; // preserve the sheet ID
     saveConfig(); initState(); render();
     populateAdminSections(); populateAdminClasses(); populateDriveSettings();
+    setStatus('Connected','ok');
     toast('Config pulled from Google Sheet','fas fa-download','#27ae60');
-  }catch(e){toast('Pull failed: '+(e.message||e),'fas fa-triangle-exclamation','#e74c3c');}
+  }catch(e){
+    setStatus('Error','');
+    toast('Pull failed: '+(e.message||e),'fas fa-triangle-exclamation','#e74c3c');
+    console.error('pullConfigFromSheet error',e);
+  }
 }
 
 /* ═══ GOOGLE AUTH ══════════════════════════════════════════════ */
-const SCOPES='https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.compose';
+const SCOPES='openid profile email https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.compose';
 let tokenClient=null;
 
 function loadGoogleAPIs(){
@@ -1798,42 +1837,81 @@ async function initGapiClient(){
   }catch(e){console.warn('GAPI init',e);}
 }
 function initTokenClient(){
-  const cid=getClientId();if(!cid)return;
+  const cid=getClientId(); if(!cid) return;
   try{
     tokenClient=google.accounts.oauth2.initTokenClient({
-      client_id:cid,scope:SCOPES,callback:handleToken
+      client_id:cid, scope:SCOPES, callback:handleToken,
     });
-  }catch(e){console.warn('GIS init',e);}
+    // Attempt silent sign-in if we have a stored email from a previous session
+    const lastEmail = localStorage.getItem('guitar_last_signed_in_email');
+    if(lastEmail) silentSignIn(lastEmail);
+    else showSignInBanner();
+  }catch(e){ console.warn('GIS init',e); showSignInBanner(); }
+}
+
+function silentSignIn(hint){
+  // Uses prompt:'' (no UI) + login_hint to silently restore the session.
+  // If it fails (token expired, permissions revoked), falls back to showing the banner.
+  try{
+    const silentClient = google.accounts.oauth2.initTokenClient({
+      client_id: getClientId(),
+      scope: SCOPES,
+      prompt: '',
+      login_hint: hint,
+      callback(resp){
+        if(resp.error || !resp.access_token){
+          // Silent refresh failed — show gentle banner, don't force a popup
+          showSignInBanner();
+          return;
+        }
+        accessToken = resp.access_token;
+        if(typeof gapi !== 'undefined') gapi.client.setToken({access_token: accessToken});
+        fetchUserInfo(true); // true = silent (no "Signed in as…" toast on auto-restore)
+      }
+    });
+    silentClient.requestAccessToken({prompt:'', login_hint: hint});
+  }catch(e){ showSignInBanner(); }
+}
+
+function showSignInBanner(){
+  const b = document.getElementById('configBanner');
+  if(b && !accessToken) b.style.display='flex';
+}
+function hideSignInBanner(){
+  const b = document.getElementById('configBanner');
+  if(b) b.style.display='none';
 }
 function handleToken(resp){
-  if(resp.error){toast('Sign-in failed: '+resp.error,'fas fa-triangle-exclamation','#e74c3c');return;}
+  if(resp.error){ toast('Sign-in failed: '+resp.error,'fas fa-triangle-exclamation','#e74c3c'); return; }
   accessToken=resp.access_token;
-  if(typeof gapi!=='undefined')gapi.client.setToken({access_token:accessToken});
-  fetchUserInfo();
+  if(typeof gapi!=='undefined') gapi.client.setToken({access_token:accessToken});
+  fetchUserInfo(false); // explicit sign-in — show toast
 }
-async function fetchUserInfo(){
+async function fetchUserInfo(silent=false){
   if(!accessToken) return;
   try{
     const r=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+accessToken}});
     const u=await r.json();
-    setSignedIn(u.name||u.email,u.email);
-    closeDriveModal();
-    toast('Signed in as '+u.email,'fab fa-google');
+    const email = u.email || u.sub || '';
+    const name  = u.name || u.given_name || email.split('@')[0] || 'Teacher';
+    if(!email){ showSignInBanner(); return; }
+    localStorage.setItem('guitar_last_signed_in_email', email);
+    setSignedIn(name, email);
+    hideSignInBanner();
+    if(!silent) closeDriveModal();
+    if(!silent) toast('Signed in as '+email,'fab fa-google');
     document.getElementById('btnLoadDrive').style.display='inline-flex';
     updateSharedSheetBadge();
     fetchAssessmentNames();
-    loadStudentsFromSheet(true); // silently refresh student list from USERS tab
-    // Pull shared config from Drive sheet only if a valid sheet ID is configured
-    const cfgId = (config.driveSettings.configSheetId||'').trim();
-    if(cfgId && cfgId.length > 10) await pullConfigFromSheet();
-    // Start background sync timer now that we have a token
+    loadStudentsFromSheet(true);
+    const cfgId=(config.driveSettings.configSheetId||'').trim();
+    if(cfgId&&cfgId.length>10) await pullConfigFromSheet();
     startSyncTimer();
-    // If a previous session flagged pending changes, sync immediately
     if(localStorage.getItem('guitar_sync_on_load')==='1'){
       localStorage.removeItem('guitar_sync_on_load');
       syncPending=true; scheduleSyncNow();
     }
-  }catch(e){toast('User info error','fas fa-triangle-exclamation','#e74c3c');}
+  }catch(e){ if(!silent) toast('User info error','fas fa-triangle-exclamation','#e74c3c'); }
 }
 function updateSharedSheetBadge(){
   const badge = document.getElementById('sharedSheetBadge');
@@ -1860,8 +1938,9 @@ function signIn(){
   tokenClient.requestAccessToken({prompt:'consent'});
 }
 function signOut(){
-  if(accessToken)google.accounts.oauth2.revoke(accessToken,()=>{});
+  if(accessToken) google.accounts.oauth2.revoke(accessToken,()=>{});
   accessToken=null;
+  localStorage.removeItem('guitar_last_signed_in_email');
   stopSyncTimer();
   document.getElementById('driveNotSignedIn').style.display='block';
   document.getElementById('driveSignedIn').style.display='none';
@@ -1871,6 +1950,7 @@ function signOut(){
   document.getElementById('statusText').textContent='Not connected';
   document.getElementById('syncBadge').style.display='none';
   document.getElementById('syncingBadge').style.display='none';
+  showSignInBanner();
   toast('Signed out','fas fa-right-from-bracket');
   closeDriveModal();
 }
