@@ -1789,12 +1789,12 @@ async function pushConfigToSheet(){
     console.error('pushConfigToSheet error',e);
   }
 }
-async function pullConfigFromSheet(){
+async function pullConfigFromSheet(silent=false){
   const inputEl = document.getElementById('adminConfigSheetId');
   const sheetId = (inputEl ? inputEl.value.trim() : '') || config.driveSettings.configSheetId;
-  if(!sheetId){ toast('Enter a Config Sheet ID first','fas fa-triangle-exclamation','#f39c12'); return; }
-  if(!accessToken){ toast('Not signed in to Drive','fas fa-triangle-exclamation','#e74c3c'); return; }
-  setStatus('Pulling config...','busy');
+  if(!sheetId){ if(!silent) toast('Enter a Config Sheet ID first','fas fa-triangle-exclamation','#f39c12'); return; }
+  if(!accessToken){ if(!silent) toast('Not signed in to Drive','fas fa-triangle-exclamation','#e74c3c'); return; }
+  if(!silent) setStatus('Pulling config...','busy');
   try{
     const r=await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent('Config!A2')}`,
@@ -1805,15 +1805,15 @@ async function pullConfigFromSheet(){
     const raw=data.values&&data.values[0]&&data.values[0][0];
     if(!raw) throw new Error('No config data found in Config tab — push first');
     config=JSON.parse(raw);
-    config.driveSettings.configSheetId = sheetId; // preserve the sheet ID
+    config.driveSettings.configSheetId = sheetId;
     saveConfig(); initState(); render();
     populateAdminSections(); populateAdminClasses(); populateDriveSettings();
-    setStatus('Connected','ok');
-    toast('Config pulled from Google Sheet','fas fa-download','#27ae60');
+    if(!silent) setStatus('Connected','ok');
+    if(!silent) toast('Config pulled from Google Sheet','fas fa-download','#27ae60');
   }catch(e){
-    setStatus('Error','');
-    toast('Pull failed: '+(e.message||e),'fas fa-triangle-exclamation','#e74c3c');
-    console.error('pullConfigFromSheet error',e);
+    if(!silent){ setStatus('Error',''); toast('Pull failed: '+(e.message||e),'fas fa-triangle-exclamation','#e74c3c'); }
+    console.info('pullConfigFromSheet:', e.message);
+    throw e; // re-throw so callers can catch
   }
 }
 
@@ -1893,10 +1893,19 @@ async function fetchUserInfo(silent=false){
     const r=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+accessToken}});
     const u=await r.json();
     const email = u.email || u.sub || '';
-    const name  = u.name || u.given_name || email.split('@')[0] || 'Teacher';
-    if(!email){ showSignInBanner(); return; }
+    const name  = u.name || u.given_name || (email ? email.split('@')[0] : '');
+    if(!email){
+      // No email returned — token likely missing openid/profile/email scopes.
+      // Force a fresh consent to pick up the new scopes.
+      showSignInBanner();
+      if(!silent){
+        toast('Please sign in again to grant updated permissions','fas fa-triangle-exclamation','#f39c12');
+        setTimeout(()=>{ if(tokenClient) tokenClient.requestAccessToken({prompt:'consent'}); }, 1200);
+      }
+      return;
+    }
     localStorage.setItem('guitar_last_signed_in_email', email);
-    setSignedIn(name, email);
+    setSignedIn(name||email, email);
     hideSignInBanner();
     if(!silent) closeDriveModal();
     if(!silent) toast('Signed in as '+email,'fab fa-google');
@@ -1904,14 +1913,18 @@ async function fetchUserInfo(silent=false){
     updateSharedSheetBadge();
     fetchAssessmentNames();
     loadStudentsFromSheet(true);
+    // Silently attempt config pull — ignore "no data" errors (tab not pushed yet)
     const cfgId=(config.driveSettings.configSheetId||'').trim();
-    if(cfgId&&cfgId.length>10) await pullConfigFromSheet();
+    if(cfgId&&cfgId.length>10){
+      try{ await pullConfigFromSheet(true); }
+      catch(e){ console.info('Config pull skipped:', e.message); }
+    }
     startSyncTimer();
     if(localStorage.getItem('guitar_sync_on_load')==='1'){
       localStorage.removeItem('guitar_sync_on_load');
       syncPending=true; scheduleSyncNow();
     }
-  }catch(e){ if(!silent) toast('User info error','fas fa-triangle-exclamation','#e74c3c'); }
+  }catch(e){ if(!silent) toast('Sign-in error: '+(e.message||e),'fas fa-triangle-exclamation','#e74c3c'); }
 }
 function updateSharedSheetBadge(){
   const badge = document.getElementById('sharedSheetBadge');
@@ -1932,10 +1945,11 @@ function setSignedIn(name,email){
 }
 function signIn(){
   const cid=getClientId();
-  if(!cid){toast('Enter your Client ID first','fas fa-key','#f39c12');return;}
-  if(!tokenClient)initTokenClient();
-  if(!tokenClient){toast('Google APIs not loaded yet, please wait','fas fa-triangle-exclamation','#e74c3c');return;}
-  tokenClient.requestAccessToken({prompt:'consent'});
+  if(!cid){ toast('Client ID missing','fas fa-key','#f39c12'); return; }
+  if(!tokenClient) initTokenClient();
+  if(!tokenClient){ toast('Google APIs not loaded yet, please wait','fas fa-triangle-exclamation','#e74c3c'); return; }
+  // select_account shows the account picker without forcing full re-consent each time
+  tokenClient.requestAccessToken({prompt:'select_account'});
 }
 function signOut(){
   if(accessToken) google.accounts.oauth2.revoke(accessToken,()=>{});
