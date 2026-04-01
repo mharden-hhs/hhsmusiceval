@@ -3,16 +3,17 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Guitar Class Final Assessment</title>
+<title>Guitar Class Assessment Portal</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap"/>
 <style>
 :root{
   --dk:#1a1a2e;--mid:#16213e;--accent:#e8b86d;--light:#f8f5f0;
   --s4:#27ae60;--s3:#2980b9;--s2:#f39c12;--s1:#e74c3c;--s0:#95a5a6;--sna:#bdc3c7;
 }
 *{box-sizing:border-box;}
-body{background:var(--light);font-family:'Segoe UI',sans-serif;margin:0;padding:0;}
+body{background:var(--light);font-family:'Lato',sans-serif;margin:0;padding:0;}
 
 /* CONFIG BANNER */
 #configBanner{background:#fff3cd;border-bottom:2px solid #ffc107;padding:9px 20px;font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
@@ -273,12 +274,7 @@ body{background:var(--light);font-family:'Segoe UI',sans-serif;margin:0;padding:
 <body>
 
 <!-- CONFIG BANNER -->
-<div id="configBanner">
-  <i class="fas fa-triangle-exclamation" style="color:#856404;"></i>
-  <strong>Setup required:</strong> Enter your Google OAuth Client ID to enable Drive sync.
-  <button class="btn btn-sm btn-warning" onclick="openDriveModal()" style="padding:2px 10px;font-size:12px;">Configure</button>
-  <span style="color:#856404;font-size:12px;"><a href="#" onclick="openSetupGuide()">Setup guide</a></span>
-</div>
+<div id="configBanner" style="display:none;"></div>
 
 <!-- HEADER -->
 <div class="app-header">
@@ -287,7 +283,7 @@ body{background:var(--light);font-family:'Segoe UI',sans-serif;margin:0;padding:
     <i class="fas fa-guitar default-icon" id="defaultIcon"></i>
     <div>
       <h1 id="brandName">Guitar Class Assessment</h1>
-      <p id="brandSub">Final Assessment Tracker</p>
+      <p id="brandSub">Assessment Portal</p>
     </div>
   </div>
   <div class="header-right">
@@ -341,6 +337,24 @@ body{background:var(--light);font-family:'Segoe UI',sans-serif;margin:0;padding:
 <!-- STUDENT BAR -->
 <div class="student-bar" id="studentBar">
   <!-- rendered dynamically from config -->
+</div>
+<!-- ASSESSMENT NAME BAR - always visible, separate from dynamic meta fields -->
+<div style="background:#f0ebe3;border-bottom:1px solid #ddd;padding:7px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+  <i class="fas fa-tag" style="color:#aaa;font-size:12px;"></i>
+  <label style="font-size:12px;font-weight:700;color:#555;margin:0;white-space:nowrap;">Assessment Name</label>
+  <input type="text" id="assessmentName" placeholder="e.g. Term 1 Final, Semester 2 Mid-term..."
+    style="font-size:13px;border:1px solid #ccc;border-radius:6px;padding:4px 10px;outline:none;width:280px;"
+    oninput="autoSave()"
+    onfocus="showAssessmentNameSuggestions()"
+    onblur="setTimeout(hideAssessmentNameSuggestions,200)"
+  />
+  <div style="position:relative;display:inline-block;">
+    <div id="assessmentNameDropdown" style="display:none;position:absolute;top:4px;left:0;background:white;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:200;min-width:240px;overflow:hidden;"></div>
+  </div>
+  <span style="font-size:11px;color:#aaa;">Each unique name creates a separate tab in the shared sheet.</span>
+  <span id="sharedSheetBadge" style="display:none;font-size:11px;background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7;border-radius:10px;padding:2px 9px;margin-left:4px;">
+    <i class="fas fa-table" style="font-size:9px;margin-right:3px;"></i>Shared sheet active
+  </span>
 </div>
 
 <!-- MAIN -->
@@ -416,6 +430,14 @@ body{background:var(--light);font-family:'Segoe UI',sans-serif;margin:0;padding:
 
   <!-- TAB: CLASSES -->
   <div class="admin-section" id="tab-classes">
+    <div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:4px;">Teacher List</div>
+    <div style="font-size:12px;color:#888;margin-bottom:10px;">These appear in the Teacher dropdown on the assessment form.</div>
+    <div id="teacherTagsWrap" style="margin-bottom:10px;min-height:36px;"></div>
+    <div style="display:flex;gap:7px;align-items:center;margin-bottom:20px;">
+      <input type="text" id="newTeacherInput" placeholder="Teacher name (e.g. Smith)" style="font-size:13px;border:1px solid #ccc;border-radius:6px;padding:5px 9px;outline:none;width:200px;" onkeydown="if(event.key==='Enter')addTeacher()"/>
+      <button class="btn btn-sm btn-success" onclick="addTeacher()"><i class="fas fa-plus"></i> Add</button>
+    </div>
+
     <div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:4px;">Class List</div>
     <div style="font-size:12px;color:#888;margin-bottom:10px;">These appear in the Class dropdown on the assessment form.</div>
     <div id="classTagsWrap" style="margin-bottom:10px;min-height:36px;"></div>
@@ -447,7 +469,23 @@ body{background:var(--light);font-family:'Segoe UI',sans-serif;margin:0;padding:
     <div style="font-size:12px;color:#888;margin-bottom:14px;">Set shared defaults so all teachers save to the same location.</div>
     <div class="drive-cfg-row">
       <label><i class="fas fa-key" style="margin-right:5px;color:#aaa;"></i>OAuth Client ID</label>
-      <input type="text" id="adminClientId" placeholder="xxxx.apps.googleusercontent.com" oninput="adminSaveCid()"/>
+      <span style="font-size:12px;color:#555;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;padding:4px 10px;font-family:monospace;word-break:break-all;">
+        243777315476-f1tiqc8junjf88mnc1msp3odj77map2g.apps.googleusercontent.com
+      </span>
+      <span style="font-size:11px;color:#27ae60;margin-left:6px;white-space:nowrap;"><i class="fas fa-lock"></i> Hardcoded</span>
+    </div>
+    <div class="drive-cfg-row">
+      <label><i class="fas fa-users" style="margin-right:5px;color:#27ae60;"></i>Student Database</label>
+      <span id="studentCountBadge" style="font-size:12px;color:#555;background:#f0f0f0;border-radius:6px;padding:4px 10px;">
+        ${STUDENT_DB.length ? STUDENT_DB.length+' students (cached)' : 'Not loaded yet'}
+      </span>
+      <button class="btn btn-sm btn-outline-success ms-2" onclick="loadStudentsFromSheet(false)">
+        <i class="fas fa-rotate"></i> Refresh from sheet
+      </button>
+    </div>
+    <div class="drive-cfg-row">
+      <label><i class="fas fa-tag" style="margin-right:5px;color:#aaa;"></i>Default Assessment Name</label>
+      <input type="text" id="adminAssessmentName" placeholder="e.g. Term 1 Final Assessment"/>
     </div>
     <div class="drive-cfg-row">
       <label><i class="fas fa-table" style="margin-right:5px;color:#7b1fa2;"></i>Class Tracking Sheet ID</label>
@@ -614,26 +652,12 @@ body{background:var(--light);font-family:'Segoe UI',sans-serif;margin:0;padding:
   <div id="driveNotSignedIn">
     <div class="drive-opt" onclick="signIn()">
       <i class="fab fa-google" style="color:#ea4335;"></i>
-      <div><div class="opt-title">Sign in with Google</div><div class="opt-desc">Authorise access to Drive &amp; Sheets</div></div>
+      <div><div class="opt-title">Sign in with Google</div><div class="opt-desc">Use your school Google account (@hanoverstudents.org)</div></div>
     </div>
-    <div class="client-id-box">
-      <label><i class="fas fa-key" style="margin-right:4px;"></i>Google OAuth Client ID</label>
-      <input type="text" id="clientIdInput" placeholder="xxxx.apps.googleusercontent.com" oninput="saveClientId()"/>
-      <div style="font-size:11px;color:#888;margin-top:4px;">Stored locally. Set once per device.</div>
+    <div style="background:#e8f4fd;border-radius:8px;padding:9px 13px;font-size:12px;color:#1a5276;margin-top:8px;display:flex;align-items:center;gap:8px;">
+      <i class="fas fa-circle-info"></i>
+      <span>Sign in with your Hanover school account to enable Drive sync, shared sheet access, and email reports.</span>
     </div>
-    <div class="setup-steps" id="setupGuide" style="display:none;">
-      <strong>How to get your Client ID:</strong>
-      <ol>
-        <li>Go to <a href="https://console.cloud.google.com/" target="_blank">console.cloud.google.com</a></li>
-        <li>Enable <strong>Google Sheets API</strong> and <strong>Google Drive API</strong></li>
-        <li>APIs &amp; Services → Credentials → <strong>Create OAuth 2.0 Client ID</strong></li>
-        <li>Type: <strong>Web application</strong>. Add your URL to Authorised JavaScript Origins.</li>
-        <li>Copy the Client ID and paste above.</li>
-      </ol>
-    </div>
-    <button class="btn btn-sm btn-link" onclick="toggleSetupGuide()" style="font-size:12px;padding:0;margin-top:4px;">
-      <i class="fas fa-circle-question"></i> How do I get a Client ID?
-    </button>
   </div>
   <div id="driveSignedIn" style="display:none;">
     <div style="background:#e8f5e9;border-radius:9px;padding:9px 13px;display:flex;align-items:center;gap:9px;margin-bottom:12px;font-size:13px;">
@@ -641,10 +665,18 @@ body{background:var(--light);font-family:'Segoe UI',sans-serif;margin:0;padding:
       <div><div style="font-weight:600;" id="signedInName">Signed in</div><div style="font-size:11px;color:#555;" id="signedInEmail"></div></div>
       <button class="btn btn-sm btn-outline-secondary ms-auto" onclick="signOut()" style="font-size:11px;">Sign out</button>
     </div>
-    <div class="drive-opt" onclick="saveToNewSheet()"><i class="fas fa-file-excel" style="color:#0f9d58;"></i><div><div class="opt-title">Save as new Google Sheet</div><div class="opt-desc">Creates a new spreadsheet in your Drive</div></div></div>
-    <div class="drive-opt" onclick="saveToBoundSheet()"><i class="fas fa-floppy-disk" style="color:#1a73e8;"></i><div><div class="opt-title">Update existing sheet</div><div class="opt-desc">Overwrite the currently linked spreadsheet</div></div></div>
-    <div class="drive-opt" onclick="loadFromDriveDialog()"><i class="fas fa-folder-open" style="color:#fbbc04;"></i><div><div class="opt-title">Open from Drive</div><div class="opt-desc">Load a saved assessment</div></div></div>
-    <div class="drive-opt" onclick="addToTrackingSheet()"><i class="fas fa-table-list" style="color:#7b1fa2;"></i><div><div class="opt-title">Append to class tracking sheet</div><div class="opt-desc">Add student scores to class roster</div></div></div>
+    <div class="drive-opt" onclick="saveToDrive()">
+      <i class="fas fa-floppy-disk" style="color:#1a73e8;"></i>
+      <div><div class="opt-title">Save to shared sheet</div><div class="opt-desc">Write this assessment to the shared class Google Sheet</div></div>
+    </div>
+    <div class="drive-opt" onclick="loadFromDriveDialog()">
+      <i class="fas fa-folder-open" style="color:#fbbc04;"></i>
+      <div><div class="opt-title">Load from shared sheet</div><div class="opt-desc">Browse assessments saved in the shared sheet by tab</div></div>
+    </div>
+    <div style="background:#e8f4fd;border-radius:8px;padding:9px 13px;font-size:12px;color:#1a5276;margin-top:8px;display:flex;align-items:center;gap:8px;">
+      <i class="fas fa-circle-info"></i>
+      <span>Each <strong>Assessment Name</strong> in the bar above becomes a separate tab. Set the shared Sheet ID in Admin → Drive Settings.</span>
+    </div>
   </div>
   <button class="btn btn-outline-secondary w-100 mt-3" onclick="closeDriveModal()">Close</button>
 </div>
@@ -712,13 +744,14 @@ const DEFAULT_CONFIG = {
     {v:'NA',l:'N/A',label:'Not Assessed',c:'ana'},
   ],
   classes:['1A','2A','1B','5B'],
+  teachers:['Wade','Harden'],
   metaFields:[
     {id:'studentName',label:'Student',type:'text',placeholder:'Student name...',width:'190px',required:true},
     {id:'classSelect',label:'Class',type:'select',width:'120px',required:true},
     {id:'assessDate',label:'Date',type:'date',width:'145px',required:false},
-    {id:'teacherName',label:'Teacher',type:'text',placeholder:'Teacher name...',width:'140px',required:false},
+    {id:'teacherName',label:'Teacher',type:'select',placeholder:'',width:'140px',required:false},
   ],
-  driveSettings:{ trackingSheetId:'', defaultFolderId:'', configSheetId:'' },
+  driveSettings:{ trackingSheetId:'1h5EXqBDXVtxNkYWooC5oLgZ54LCoauE8Siuryq-QX4w', defaultFolderId:'', configSheetId:'', defaultAssessmentName:'', syncInterval:60 },
   adminPin:'1234',
 };
 
@@ -775,17 +808,30 @@ function renderStudentBar(){
           <div class="sb-dropdown" id="sbDropdown"></div>
         </div>`;
     }
-    // Class field — read-only when student is loaded from DB, still editable manually
+    // Teacher field — rendered as its own dropdown from config.teachers list
+    if(f.id === 'teacherName'){
+      const opts = (config.teachers||[]).map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
+      const input = `<select id="teacherName" onchange="autoSave()" style="width:${f.width||'140px'}"><option value="">Select teacher...</option>${opts}</select>`;
+      return `<label><i class="fas fa-chalkboard-teacher" style="color:#bbb;margin-right:4px;font-size:11px;"></i>${esc(f.label)}</label>${input}`;
+    }
+    // Class field — populated from USERS data if available, otherwise config.classes
+    if(f.type==='select' && f.id==='classSelect'){
+      // Derive unique class list from live USERS data, fallback to config.classes
+      const uniqueClasses = STUDENT_DB.length
+        ? [...new Set(STUDENT_DB.map(s=>s.cls).filter(Boolean))].sort()
+        : config.classes;
+      const opts = uniqueClasses.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+      const input = `<select id="${f.id}" onchange="autoSave()" style="width:${f.width||'200px'}"><option value="">Select class...</option>${opts}</select>`;
+      return `<label><i class="fas fa-users" style="color:#bbb;margin-right:4px;font-size:11px;"></i>${esc(f.label)}</label>${input}`;
+    }
+    // Remaining field types: date and text
     let input='';
-    if(f.type==='select'){
-      const opts=config.classes.map(c=>`<option value="${c}">${c}</option>`).join('');
-      input=`<select id="${f.id}" onchange="autoSave()" style="width:${f.width||'120px'}"><option value="">Select...</option>${opts}</select>`;
-    } else if(f.type==='date'){
+    if(f.type==='date'){
       input=`<input type="date" id="${f.id}" oninput="autoSave()" style="width:${f.width||'145px'}"/>`;
     } else {
       input=`<input type="text" id="${f.id}" placeholder="${f.placeholder||''}" oninput="autoSave()" style="width:${f.width||'160px'}"/>`;
     }
-    const icon = f.id==='classSelect' ? 'fa-users' : f.id==='teacherName' ? 'fa-chalkboard-teacher' : 'fa-tag';
+    const icon = 'fa-tag';
     return `<label><i class="fas ${icon}" style="color:#bbb;margin-right:4px;font-size:11px;"></i>${esc(f.label)}</label>${input}`;
   }).join('');
   const d=document.getElementById('assessDate');
@@ -867,15 +913,24 @@ function selectStudentFromBar(idx){
   selectedStudent = sbResults[idx];
   closeSbDropdown();
   applyStudentChip();
-  // Auto-fill class field from DB
+  // Auto-fill class directly from Column D of USERS tab (full string e.g. "Guitar 1 - 2A - Wade")
   const clsEl = document.getElementById('classSelect');
-  if(clsEl){
-    // Extract the period code from full class name e.g. "Guitar 1 - 2A - Wade" → try to match "2A"
-    const match = selectedStudent.cls.match(/- (\w+) -/);
-    const code  = match ? match[1] : '';
-    // Try exact match first, fall back to setting the full name
-    const opt = Array.from(clsEl.options).find(o=>o.value===code||selectedStudent.cls.includes(o.value));
-    if(opt) clsEl.value = opt.value; else { clsEl.value=''; }
+  if(clsEl && selectedStudent.cls){
+    // First try to find an exact option match
+    const exactOpt = Array.from(clsEl.options).find(o=>o.value===selectedStudent.cls);
+    if(exactOpt){
+      clsEl.value = selectedStudent.cls;
+    } else {
+      // Class from DB doesn't match any dropdown option — add it dynamically
+      const newOpt = document.createElement('option');
+      newOpt.value = selectedStudent.cls;
+      newOpt.textContent = selectedStudent.cls;
+      newOpt.setAttribute('data-dynamic','1');
+      // Remove any previous dynamic option first
+      Array.from(clsEl.options).filter(o=>o.getAttribute('data-dynamic')).forEach(o=>o.remove());
+      clsEl.appendChild(newOpt);
+      clsEl.value = selectedStudent.cls;
+    }
   }
   autoSave();
   toast(`${selectedStudent.name.split(',').reverse().join(' ').trim()} loaded`, 'fas fa-user-check', '#27ae60');
@@ -961,7 +1016,7 @@ function setScore(id,val,btn){
   if(c) c.querySelectorAll('.sb').forEach((b,i)=>{
     b.className='sb '+(state[id].score===config.scores[i].v?config.scores[i].c:'');
   });
-  updateSummary(); autoSave();
+  updateSummary(); autoSave(); checkAutoComplete();
 }
 function setComment(id,val){if(!state[id])state[id]={score:null,comment:'',chordName:''};state[id].comment=val;autoSave();}
 function setChordName(id,val){if(!state[id])state[id]={score:null,comment:'',chordName:''};state[id].chordName=val;autoSave();}
@@ -1208,6 +1263,7 @@ function clearForm(){
   config.metaFields.forEach(f=>{if(f.id!=='studentName'){const el=document.getElementById(f.id);if(el)el.value='';}});
   const d=document.getElementById('assessDate');if(d)d.value=new Date().toISOString().split('T')[0];
   const ta=document.getElementById('overallComments');if(ta)ta.value='';
+  resetAutoComplete();
   renderAssessment(); updateSummary(); toast('Form reset','fas fa-rotate-left');
 }
 function newAssessment(){if(!confirm('Start a new blank assessment?'))return;clearForm();}
@@ -1433,6 +1489,7 @@ function setupDragDrop(){
 
 /* ── CLASSES BUILDER ───────────────────────────────────────── */
 function populateAdminClasses(){
+  renderTeacherTags();
   renderClassTags();
   const mf=document.getElementById('metaFieldsBuilder');
   mf.innerHTML=config.metaFields.map((f,i)=>`
@@ -1447,6 +1504,24 @@ function populateAdminClasses(){
       ${f.required?'<span style="font-size:11px;color:#888;white-space:nowrap;">required</span>':
         `<button class="btn-icon" onclick="config.metaFields.splice(${i},1);populateAdminClasses()"><i class="fas fa-trash"></i></button>`}
     </div>`).join('');
+}
+function renderTeacherTags(){
+  const wrap = document.getElementById('teacherTagsWrap');
+  if(!wrap) return;
+  wrap.innerHTML = (config.teachers||[]).map((t,i)=>
+    `<span class="class-tag">${esc(t)}<button onclick="removeTeacher(${i})" title="Remove">×</button></span>`
+  ).join('');
+}
+function addTeacher(){
+  const inp = document.getElementById('newTeacherInput');
+  const v = (inp.value||'').trim();
+  if(!v) return;
+  if(!config.teachers) config.teachers=[];
+  if(!config.teachers.includes(v)) config.teachers.push(v);
+  inp.value=''; renderTeacherTags();
+}
+function removeTeacher(i){
+  config.teachers.splice(i,1); renderTeacherTags();
 }
 function renderClassTags(){
   document.getElementById('classTagsWrap').innerHTML=config.classes.map((c,i)=>
@@ -1471,36 +1546,34 @@ function addMetaField(){
 }
 function saveAndApplyClasses(){
   saveConfig(); renderStudentBar(); closeAdmin();
-  toast('Classes & fields saved','fas fa-check-circle','#27ae60');
+  toast('Teachers, classes & fields saved','fas fa-check-circle','#27ae60');
 }
 
 /* ── DRIVE SETTINGS ────────────────────────────────────────── */
 function populateDriveSettings(){
-  const cid=getClientId();
-  document.getElementById('adminClientId').value=cid;
   document.getElementById('adminTrackId').value=config.driveSettings.trackingSheetId||localStorage.getItem('guitar_tracking_sheet_id')||'';
   document.getElementById('adminFolderId').value=config.driveSettings.defaultFolderId||'';
   document.getElementById('adminConfigSheetId').value=config.driveSettings.configSheetId||'';
+  document.getElementById('adminAssessmentName').value=config.driveSettings.defaultAssessmentName||'';
   const sel=document.getElementById('adminSyncInterval');
   if(sel) sel.value=String(config.driveSettings.syncInterval||60);
-}
-function adminSaveCid(){
-  const v=document.getElementById('adminClientId').value.trim();
-  localStorage.setItem('guitar_gapi_client_id',v);
-  document.getElementById('clientIdInput').value=v;
-  if(v) document.getElementById('configBanner').classList.add('hidden');
-  initTokenClient();
 }
 function saveDriveSettings(){
   config.driveSettings.trackingSheetId=document.getElementById('adminTrackId').value.trim();
   config.driveSettings.defaultFolderId=document.getElementById('adminFolderId').value.trim();
   config.driveSettings.configSheetId=document.getElementById('adminConfigSheetId').value.trim();
+  config.driveSettings.defaultAssessmentName=document.getElementById('adminAssessmentName').value.trim();
   const sel=document.getElementById('adminSyncInterval');
   if(sel){ config.driveSettings.syncInterval=parseInt(sel.value)||60; syncIntervalSeconds=config.driveSettings.syncInterval; }
   if(config.driveSettings.trackingSheetId) localStorage.setItem('guitar_tracking_sheet_id',config.driveSettings.trackingSheetId);
   saveConfig();
+  // Apply default assessment name to the bar field if it's currently empty
+  const anEl=document.getElementById('assessmentName');
+  if(anEl&&!anEl.value&&config.driveSettings.defaultAssessmentName) anEl.value=config.driveSettings.defaultAssessmentName;
+  // Update shared sheet badge visibility
+  updateSharedSheetBadge();
   // Restart timer with new interval
-  if(accessToken) startSyncTimer();
+  if(accessToken){ startSyncTimer(); fetchAssessmentNames(); }
   toast('Drive settings saved','fas fa-check-circle','#27ae60');
 }
 
@@ -1618,6 +1691,9 @@ async function fetchUserInfo(){
     closeDriveModal();
     toast('Signed in as '+u.email,'fab fa-google');
     document.getElementById('btnLoadDrive').style.display='inline-flex';
+    updateSharedSheetBadge();
+    fetchAssessmentNames();
+    loadStudentsFromSheet(true); // silently refresh student list from USERS tab
     // Pull shared config from Drive sheet only if a valid sheet ID is configured
     const cfgId = (config.driveSettings.configSheetId||'').trim();
     if(cfgId && cfgId.length > 10) await pullConfigFromSheet();
@@ -1630,6 +1706,11 @@ async function fetchUserInfo(){
     }
   }catch(e){toast('User info error','fas fa-triangle-exclamation','#e74c3c');}
 }
+function updateSharedSheetBadge(){
+  const badge = document.getElementById('sharedSheetBadge');
+  if(badge) badge.style.display = getSharedSheetId() ? 'inline-flex' : 'none';
+}
+
 function setSignedIn(name,email){
   if(!email) return;
   signedInEmail = email;
@@ -1665,184 +1746,360 @@ function signOut(){
   closeDriveModal();
 }
 
-/* ═══ SHEETS INTEGRATION ═══════════════════════════════════════ */
-function buildSheetValues(){
-  const m=getFormMeta();
-  const headerRow=config.metaFields.map(f=>f.label);
-  const metaRow=config.metaFields.map(f=>m[f.id]||'');
-  const rows=[
-    ['Guitar Class Final Assessment'],
-    headerRow,metaRow,[],
-    ['','ASSESSMENT TARGET','4 (Mastery)','3 (Proficient)','2 (Developing)','1 (Not Achieved)','0 (Not Attempted)','Not Assessed','Score','Comments'],
-  ];
-  config.sections.forEach(sec=>{
-    rows.push([sec.title]);
-    sec.subsections.forEach(sub=>{
-      rows.push(['',sub.label]);
-      sub.items.forEach(item=>{
-        const s=state[item.id]||{};
-        const lbl=item.editable&&s.chordName?`${item.label} (${s.chordName})`:item.label;
-        const r=['',lbl,'','','','','','',s.score||'',s.comment||''];
-        if(s.score&&s.score!=='NA'){const idx={'4':2,'3':3,'2':4,'1':5,'0':6}[s.score];if(idx!==undefined)r[idx]='✓';}
-        else if(s.score==='NA')r[7]='✓';
-        rows.push(r);
-      });
-    });
-    rows.push([]);
-  });
-  rows.push(['Overall Comments:',m.comments||'']);
-  return rows;
+/* ═══════════════════════════════════════════════════════════════
+   SHARED SHEET INTEGRATION
+   ═══════════════════════════════════════════════════════════════
+   One shared Google Sheet, one tab per Assessment Name.
+   Each tab has one row per student — upsert on email match.
+   Auto-saves when all items are scored; also saves on manual trigger.
+   ═══════════════════════════════════════════════════════════════ */
+
+function getAssessmentName(){
+  return (document.getElementById('assessmentName')||{}).value?.trim() || 'Assessment';
 }
-async function saveToNewSheet(){
-  if(!accessToken){toast('Not signed in','fas fa-triangle-exclamation','#e74c3c');return;}
-  closeDriveModal(); setStatus('Saving...','busy');
-  try{
-    const m=getFormMeta();
-    const nm=config.metaFields.find(f=>f.id==='studentName');
-    const student=nm&&m[nm.id]?m[nm.id]:'Student';
-    const title=`Guitar Assessment — ${student} — ${m.assessDate||new Date().toISOString().split('T')[0]}`;
-    const body={properties:{title},sheets:[{properties:{title:'Assessment'}}]};
-    const folder=config.driveSettings.defaultFolderId;
-    const cr=await fetch('https://sheets.googleapis.com/v4/spreadsheets',{
+
+function getSharedSheetId(){
+  return (config.driveSettings.trackingSheetId||'').trim() ||
+         localStorage.getItem('guitar_tracking_sheet_id')||'';
+}
+
+/* ── Build the flat row for the shared sheet ─────────────────── */
+function buildSharedRow(){
+  const m  = getFormMeta();
+  const all = getAllItems();
+  const scores  = all.map(i=>(state[i.id]||{}).score||'');
+  const numeric = scores.filter(s=>s&&s!=='NA').map(Number);
+  const avg     = numeric.length ? (numeric.reduce((a,b)=>a+b,0)/numeric.length).toFixed(2) : '';
+  return [
+    m.studentName   || '',
+    (selectedStudent||{}).email || m.studentEmail || '',
+    m.classSelect   || (selectedStudent||{}).cls  || '',
+    String((selectedStudent||{}).grade || ''),
+    m.assessDate    || '',
+    m.teacherName   || '',
+    ...scores,
+    avg,
+    m.comments      || ''
+  ];
+}
+
+function buildSharedHeader(){
+  const all = getAllItems();
+  return [
+    'Student','Email','Class','Grade','Date','Teacher',
+    ...all.map(i=>i.label),
+    'Avg Score','Overall Comments'
+  ];
+}
+
+/* ── Ensure the tab exists; return its sheetId (numeric) ─────── */
+async function ensureTab(spreadsheetId, tabName){
+  // Fetch current sheet metadata
+  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties`,{
+    headers:{Authorization:'Bearer '+accessToken}
+  });
+  const meta = await r.json();
+  const existing = (meta.sheets||[]).find(s=>s.properties.title===tabName);
+  if(existing) return existing.properties.sheetId;
+
+  // Create the tab
+  const cr = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,{
+    method:'POST',
+    headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+    body: JSON.stringify({requests:[{addSheet:{properties:{title:tabName}}}]})
+  });
+  const crData = await cr.json();
+  const newSheetId = crData.replies[0].addSheet.properties.sheetId;
+
+  // Write header row to new tab
+  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(tabName)}!A1?valueInputOption=USER_ENTERED`,{
+    method:'PUT',
+    headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+    body: JSON.stringify({range:`${tabName}!A1`,majorDimension:'ROWS',values:[buildSharedHeader()]})
+  });
+
+  // Format header row
+  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,{
+    method:'POST',
+    headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+    body: JSON.stringify({requests:[
+      {repeatCell:{
+        range:{sheetId:newSheetId,startRowIndex:0,endRowIndex:1},
+        cell:{userEnteredFormat:{
+          backgroundColor:{red:.102,green:.102,blue:.18},
+          textFormat:{foregroundColor:{red:1,green:1,blue:1},bold:true}
+        }},
+        fields:'userEnteredFormat(backgroundColor,textFormat)'
+      }},
+      {updateSheetProperties:{
+        properties:{sheetId:newSheetId,gridProperties:{frozenRowCount:1}},
+        fields:'gridProperties.frozenRowCount'
+      }}
+    ]})
+  });
+
+  return newSheetId;
+}
+
+/* ── Find existing student row in tab (match on email col B) ─── */
+async function findStudentRow(spreadsheetId, tabName, email){
+  if(!email) return -1;
+  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(tabName)}!B:B`,{
+    headers:{Authorization:'Bearer '+accessToken}
+  });
+  const data = await r.json();
+  const rows = data.values||[];
+  for(let i=1;i<rows.length;i++){
+    if((rows[i][0]||'').toLowerCase()===email.toLowerCase()) return i+1; // 1-indexed sheet row
+  }
+  return -1;
+}
+
+/* ── Core upsert: update existing row or append new one ──────── */
+async function upsertStudentRow(spreadsheetId, tabName){
+  const row   = buildSharedRow();
+  const email = row[1];
+  const existingRow = await findStudentRow(spreadsheetId, tabName, email);
+
+  if(existingRow > 0){
+    // Update existing row
+    const range = `${tabName}!A${existingRow}`;
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,{
+      method:'PUT',
+      headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+      body: JSON.stringify({range,majorDimension:'ROWS',values:[row]})
+    });
+    return 'updated';
+  } else {
+    // Append new row
+    const range = `${tabName}!A1`;
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,{
       method:'POST',
       headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-      body:JSON.stringify(body)
+      body: JSON.stringify({majorDimension:'ROWS',values:[row]})
     });
-    const sheet=await cr.json();
-    if(!sheet.spreadsheetId)throw new Error(sheet.error?.message||'Create failed');
-    currentSheetId=sheet.spreadsheetId;
-    if(folder){
-      await fetch(`https://www.googleapis.com/drive/v3/files/${currentSheetId}?addParents=${folder}`,{
-        method:'PATCH',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:'{}'
-      });
-    }
-    await writeSheetData(currentSheetId);
+    return 'appended';
+  }
+}
+
+/* ── Main save function ──────────────────────────────────────── */
+async function saveToSharedSheet(silent=false){
+  const sharedId = getSharedSheetId();
+  if(!sharedId){
+    if(!silent) toast('No shared sheet configured. Set it in Admin → Drive Settings.','fas fa-triangle-exclamation','#f39c12');
+    return false;
+  }
+  if(!accessToken){
+    if(!silent) toast('Not signed in to Google','fas fa-triangle-exclamation','#e74c3c');
+    return false;
+  }
+  const tabName = getAssessmentName();
+  if(!tabName){
+    if(!silent) toast('Please enter an Assessment Name first','fas fa-triangle-exclamation','#f39c12');
+    return false;
+  }
+
+  setStatus('Saving...','busy');
+  try{
+    await ensureTab(sharedId, tabName);
+    const result = await upsertStudentRow(sharedId, tabName);
     syncPending=false; lastSyncedAt=Date.now(); updateSyncBadge();
-    setStatus('Saved','ok'); saveToHistory(); autoSave();
-    toast('Saved: '+title,'fas fa-circle-check','#27ae60');
-    startSyncTimer();
-    setTimeout(()=>{if(confirm('Open in Google Sheets?'))window.open('https://docs.google.com/spreadsheets/d/'+currentSheetId,'_blank');},500);
-  }catch(e){setStatus('Error','');toast('Save failed: '+(e.message||e),'fas fa-triangle-exclamation','#e74c3c');}
+    setStatus('Saved','ok');
+    if(!silent){
+      const action = result==='updated' ? 'Row updated' : 'Row added';
+      toast(`${action} in "${tabName}"`, 'fas fa-circle-check','#27ae60');
+    }
+    saveToHistory(); autoSave();
+    return true;
+  }catch(e){
+    setStatus('Error','');
+    if(!silent) toast('Save failed: '+(e.message||e),'fas fa-triangle-exclamation','#e74c3c');
+    console.error('Shared sheet save error',e);
+    return false;
+  }
 }
-async function saveToBoundSheet(){
-  if(!currentSheetId){await saveToNewSheet();return;}
-  if(!accessToken){toast('Not signed in','fas fa-triangle-exclamation','#e74c3c');return;}
-  closeDriveModal(); setStatus('Updating...','busy');
-  try{await writeSheetData(currentSheetId);syncPending=false;lastSyncedAt=Date.now();updateSyncBadge();setStatus('Saved','ok');saveToHistory();autoSave();toast('Sheet updated','fas fa-circle-check','#27ae60');}
-  catch(e){setStatus('Error','');toast('Update failed: '+(e.message||e),'fas fa-triangle-exclamation','#e74c3c');}
+
+/* ── Check if all items are scored → auto-save ───────────────── */
+function checkAutoComplete(){
+  if(!getSharedSheetId()||!accessToken) return;
+  const all = getAllItems();
+  const allScored = all.every(i=>(state[i.id]||{}).score!==null);
+  if(allScored && !window._autoCompleteFired){
+    window._autoCompleteFired = true;
+    saveToSharedSheet(true).then(ok=>{
+      if(ok) toast('All items scored — saved to shared sheet','fas fa-circle-check','#27ae60');
+    });
+  }
 }
-async function writeSheetData(sheetId){
-  const values=buildSheetValues();
-  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Assessment!A1?valueInputOption=USER_ENTERED`,{
-    method:'PUT',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-    body:JSON.stringify({range:'Assessment!A1',majorDimension:'ROWS',values})
-  });
-  await applyFormatting(sheetId);
+
+/* ── Reset auto-complete flag when form is cleared ───────────── */
+function resetAutoComplete(){ window._autoCompleteFired = false; }
+
+/* ── Manual Save to Drive button ────────────────────────────── */
+async function saveToDrive(){
+  closeDriveModal();
+  if(!accessToken){ openDriveModal(); return; }
+  const sharedId = getSharedSheetId();
+  if(sharedId){
+    await saveToSharedSheet(false);
+    const url = 'https://docs.google.com/spreadsheets/d/'+sharedId;
+    setTimeout(()=>{ if(confirm('Open shared sheet in Google Sheets?')) window.open(url,'_blank'); },600);
+  } else {
+    toast('No shared sheet configured. Go to Admin → Drive Settings to add the Sheet ID.','fas fa-triangle-exclamation','#f39c12');
+    openDriveModal();
+  }
 }
-async function applyFormatting(sheetId){
-  const req=[
-    {repeatCell:{range:{sheetId:0,startRowIndex:0,endRowIndex:1,startColumnIndex:0,endColumnIndex:10},
-      cell:{userEnteredFormat:{backgroundColor:{red:.102,green:.102,blue:.18},textFormat:{foregroundColor:{red:1,green:1,blue:1},bold:true,fontSize:13}}},
-      fields:'userEnteredFormat(backgroundColor,textFormat)'}},
-    {repeatCell:{range:{sheetId:0,startRowIndex:4,endRowIndex:5,startColumnIndex:0,endColumnIndex:10},
-      cell:{userEnteredFormat:{backgroundColor:{red:.2,green:.2,blue:.3},textFormat:{foregroundColor:{red:1,green:1,blue:1},bold:true}}},
-      fields:'userEnteredFormat(backgroundColor,textFormat)'}},
-    {updateSheetProperties:{properties:{sheetId:0,gridProperties:{frozenRowCount:5}},fields:'gridProperties.frozenRowCount'}},
-    {autoResizeDimensions:{dimensions:{sheetId:0,dimension:'COLUMNS',startIndex:0,endIndex:10}}}
-  ];
-  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`,{
-    method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-    body:JSON.stringify({requests:req})
-  });
+
+/* ── Background sync uses shared sheet ──────────────────────── */
+async function backgroundSync(){
+  if(!syncPending)  return;
+  if(syncInFlight)  return;
+  if(!isOnline)     return;
+  if(!accessToken)  return;
+  if(!getSharedSheetId()) return;
+
+  const m = getFormMeta();
+  if(!m.studentName) return; // don't sync blank assessments
+
+  syncInFlight = true;
+  updateSyncBadge();
+  try{
+    await saveToSharedSheet(true);
+    syncPending  = false;
+    lastSyncedAt = Date.now();
+    setStatus('Synced','ok');
+  }catch(e){
+    if(e.message&&e.message.includes('401')) accessToken=null;
+    setStatus('Sync error','');
+  }finally{
+    syncInFlight = false;
+    updateSyncBadge();
+  }
 }
+
+/* ── Assessment name suggestions (from sheet tabs) ───────────── */
+let knownAssessmentNames = [];
+async function fetchAssessmentNames(){
+  const sharedId = getSharedSheetId();
+  if(!sharedId||!accessToken) return;
+  try{
+    const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sharedId}?fields=sheets.properties.title`,{
+      headers:{Authorization:'Bearer '+accessToken}
+    });
+    const data = await r.json();
+    knownAssessmentNames = (data.sheets||[]).map(s=>s.properties.title);
+  }catch(e){}
+}
+function showAssessmentNameSuggestions(){
+  const dd = document.getElementById('assessmentNameDropdown');
+  const inp = document.getElementById('assessmentName');
+  if(!dd||!inp) return;
+  const q = inp.value.toLowerCase();
+  const matches = knownAssessmentNames.filter(n=>!q||n.toLowerCase().includes(q));
+  if(!matches.length){ dd.style.display='none'; return; }
+  dd.innerHTML = matches.map(n=>`
+    <div onclick="document.getElementById('assessmentName').value='${n.replace(/'/g,"\\'")}';hideAssessmentNameSuggestions();autoSave();"
+      style="padding:8px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f5f5f5;display:flex;align-items:center;gap:8px;"
+      onmouseover="this.style.background='#fffdf5'" onmouseout="this.style.background='white'">
+      <i class="fas fa-table" style="color:#aaa;font-size:11px;"></i>${n}
+    </div>`).join('');
+  dd.style.display='block';
+}
+function hideAssessmentNameSuggestions(){
+  const dd=document.getElementById('assessmentNameDropdown');
+  if(dd) dd.style.display='none';
+}
+
+/* ── Deprecated individual sheet functions (kept for load compat) */
+async function saveToNewSheet(){ await saveToDrive(); }
+async function saveToBoundSheet(){ await saveToDrive(); }
+async function addToTrackingSheet(){ await saveToDrive(); }
+
+/* ── Load from Drive — now reads from shared sheet tabs ───────── */
 async function loadFromDriveDialog(){
   if(!accessToken){toast('Please sign in first','fas fa-triangle-exclamation','#e74c3c');return;}
-  closeDriveModal(); setStatus('Searching...','busy');
+  const sharedId = getSharedSheetId();
+  if(!sharedId){toast('No shared sheet configured in Admin → Drive Settings','fas fa-triangle-exclamation','#f39c12');return;}
+  closeDriveModal(); setStatus('Loading tabs...','busy');
   try{
-    const r=await fetch(`https://www.googleapis.com/drive/v3/files?q=name+contains+'Guitar+Assessment'&fields=files(id,name,modifiedTime)&orderBy=modifiedTime+desc`,{
+    const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sharedId}?fields=sheets.properties`,{
       headers:{Authorization:'Bearer '+accessToken}
     });
     const data=await r.json();
+    const tabs=(data.sheets||[]).map(s=>s.properties.title);
     setStatus('Connected','ok');
-    if(!data.files||!data.files.length){toast('No Guitar Assessment files found','fas fa-folder-open');return;}
-    showFilePicker(data.files);
-  }catch(e){setStatus('Error','');toast('Search failed','fas fa-triangle-exclamation','#e74c3c');}
+    if(!tabs.length){toast('Shared sheet has no assessment tabs yet','fas fa-folder-open');return;}
+    showTabPicker(sharedId, tabs);
+  }catch(e){setStatus('Error','');toast('Failed to read shared sheet: '+(e.message||e),'fas fa-triangle-exclamation','#e74c3c');}
 }
-function showFilePicker(files){
-  document.getElementById('histList').innerHTML=files.map(f=>`
-    <div class="hist-row">
-      <div><div class="hist-name">${esc(f.name)}</div><div class="hist-meta">${new Date(f.modifiedTime).toLocaleDateString()}</div></div>
-      <button class="btn btn-sm btn-outline-primary" onclick="loadSheetById('${f.id}','${esc(f.name)}')">Open</button>
-    </div>`).join('');
+
+function showTabPicker(sharedId, tabs){
+  document.getElementById('histList').innerHTML=`
+    <div style="font-size:12px;color:#888;margin-bottom:10px;">Select an assessment to load a student from:</div>
+    ${tabs.map(t=>`
+      <div class="hist-row">
+        <div><div class="hist-name"><i class="fas fa-table" style="color:#7b1fa2;margin-right:6px;font-size:12px;"></i>${esc(t)}</div></div>
+        <button class="btn btn-sm btn-outline-primary" onclick="loadTabStudents('${sharedId}','${t.replace(/'/g,"\\'")}')">View</button>
+      </div>`).join('')}`;
   document.getElementById('histModal').classList.add('open');
 }
-async function loadSheetById(fileId,fileName){
-  closeHistory(); setStatus('Loading...','busy');
+
+async function loadTabStudents(sharedId, tabName){
+  setStatus('Loading...','busy');
   try{
-    const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${fileId}/values/Assessment`,{headers:{Authorization:'Bearer '+accessToken}});
+    const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sharedId}/values/${encodeURIComponent(tabName)}`,{
+      headers:{Authorization:'Bearer '+accessToken}
+    });
     const data=await r.json();
-    parseSheetIntoState(data.values||[]);
-    currentSheetId=fileId;
-    renderAssessment(); updateSummary(); setStatus('Connected','ok'); autoSave();
-    toast('Loaded: '+fileName,'fas fa-folder-open');
+    const rows=(data.values||[]).slice(1); // skip header
+    if(!rows.length){toast('No student data in this tab yet','fas fa-circle-info');return;}
+    document.getElementById('histList').innerHTML=`
+      <div style="font-size:12px;color:#888;margin-bottom:8px;">
+        <button class="btn btn-sm btn-outline-secondary" onclick="loadFromDriveDialog()" style="font-size:11px;padding:2px 8px;margin-right:6px;">
+          <i class="fas fa-arrow-left"></i> Back
+        </button>
+        <strong>${esc(tabName)}</strong> — select a student to load:
+      </div>
+      ${rows.map((row,i)=>`
+        <div class="hist-row">
+          <div>
+            <div class="hist-name">${esc(row[0]||'Unknown')}</div>
+            <div class="hist-meta">${esc(row[2]||'')} · ${esc(row[4]||'')} · Teacher: ${esc(row[5]||'')}</div>
+          </div>
+          <button class="btn btn-sm btn-outline-primary" onclick="loadStudentRow(${JSON.stringify(row).replace(/"/g,'&quot;')},'${tabName.replace(/'/g,"\\'")}')">Load</button>
+        </div>`).join('')}`;
+    setStatus('Connected','ok');
   }catch(e){setStatus('Error','');toast('Load failed: '+(e.message||e),'fas fa-triangle-exclamation','#e74c3c');}
 }
-function parseSheetIntoState(rows){
-  try{
-    const metaRow=rows[2]||[];
-    config.metaFields.forEach((f,i)=>{const el=document.getElementById(f.id);if(el&&metaRow[i])el.value=metaRow[i];});
-    initState();
-    const allItems=getAllItems();
-    rows.slice(5).forEach(row=>{
-      if(!row||row.length<2)return;
-      const lbl=(row[1]||'').toLowerCase().replace(/\s*\(.*?\)/g,'').trim();
-      const item=allItems.find(i=>i.label.toLowerCase().includes(lbl)||lbl.includes(i.label.toLowerCase()));
-      if(!item)return;
-      const s=state[item.id];
-      s.score=row[8]||null;
-      s.comment=row[9]||'';
-      const m=(row[1]||'').match(/\(([^)]+)\)/);
-      if(m)s.chordName=m[1];
-    });
-    const last=rows[rows.length-1]||[];
-    if(last[0]==='Overall Comments:'){const ta=document.getElementById('overallComments');if(ta)ta.value=last[1]||'';}
-  }catch(e){console.warn('Parse error',e);}
-}
-async function addToTrackingSheet(){
-  if(!accessToken){toast('Not signed in','fas fa-triangle-exclamation','#e74c3c');return;}
-  closeDriveModal();
-  let trackId=config.driveSettings.trackingSheetId||localStorage.getItem('guitar_tracking_sheet_id');
-  if(!trackId){
-    const cr=await fetch('https://sheets.googleapis.com/v4/spreadsheets',{
-      method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-      body:JSON.stringify({properties:{title:'Guitar Class Tracking Sheet'},sheets:[{properties:{title:'Tracking'}}]})
-    });
-    const sh=await cr.json();
-    trackId=sh.spreadsheetId;
-    localStorage.setItem('guitar_tracking_sheet_id',trackId);
-    config.driveSettings.trackingSheetId=trackId; saveConfig();
-    const headers=[config.metaFields.map(f=>f.label).concat(getAllItems().map(i=>i.label)).concat(['Avg Score','Overall Comments'])];
-    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${trackId}/values/Tracking!A1?valueInputOption=USER_ENTERED`,{
-      method:'PUT',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-      body:JSON.stringify({range:'Tracking!A1',majorDimension:'ROWS',values:headers})
-    });
+
+function loadStudentRow(row, tabName){
+  closeHistory();
+  initState();
+  // Restore meta fields
+  const nameEl=document.getElementById('sbInput'); if(nameEl) nameEl.value=row[0]||'';
+  const clsEl=document.getElementById('classSelect'); if(clsEl) clsEl.value=row[2]||'';
+  const dateEl=document.getElementById('assessDate'); if(dateEl) dateEl.value=row[4]||'';
+  const teacherEl=document.getElementById('teacherName'); if(teacherEl) teacherEl.value=row[5]||'';
+  // Restore selectedStudent from DB if email matches
+  if(row[1]){
+    const found=STUDENT_DB.find(s=>s.email.toLowerCase()===row[1].toLowerCase());
+    if(found){ selectedStudent=found; applyStudentChip(); }
   }
-  const m=getFormMeta();
+  // Restore scores (columns 6 onward)
   const all=getAllItems();
-  const scores=all.map(i=>(state[i.id]||{}).score||'');
-  const numeric=scores.filter(s=>s&&s!=='NA').map(Number);
-  const avg=numeric.length?(numeric.reduce((a,b)=>a+b,0)/numeric.length).toFixed(2):'';
-  const row=[config.metaFields.map(f=>m[f.id]||'').concat(scores).concat([avg,m.comments||''])];
-  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${trackId}/values/Tracking!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,{
-    method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-    body:JSON.stringify({majorDimension:'ROWS',values:row})
+  all.forEach((item,i)=>{
+    const score=row[6+i]||null;
+    if(state[item.id]) state[item.id].score=score||null;
   });
-  toast('Added to tracking sheet','fas fa-table-list','#7b1fa2');
-  setTimeout(()=>{if(confirm('Open tracking sheet?'))window.open('https://docs.google.com/spreadsheets/d/'+trackId,'_blank');},500);
-}
-function saveToDrive(){
-  if(!accessToken){openDriveModal();return;}
-  if(currentSheetId)saveToBoundSheet();else saveToNewSheet();
+  // Restore comments (second to last column)
+  const commentsIdx=6+all.length+1;
+  const ta=document.getElementById('overallComments');
+  if(ta) ta.value=row[commentsIdx]||'';
+  // Set assessment name
+  const anEl=document.getElementById('assessmentName'); if(anEl) anEl.value=tabName;
+  renderAssessment(); updateSummary(); autoSave();
+  resetAutoComplete();
+  toast(`Loaded: ${row[0]||'student'} from "${tabName}"`,'fas fa-folder-open');
 }
 
 /* ═══ DRIVE MODAL ══════════════════════════════════════════════ */
@@ -1852,12 +2109,9 @@ function toggleSetupGuide(){const g=document.getElementById('setupGuide');g.styl
 function openSetupGuide(){openDriveModal();setTimeout(()=>document.getElementById('setupGuide').style.display='block',100);}
 
 /* ═══ UTILS ════════════════════════════════════════════════════ */
-function getClientId(){return localStorage.getItem('guitar_gapi_client_id')||'';}
-function saveClientId(){
-  const v=document.getElementById('clientIdInput').value.trim();
-  localStorage.setItem('guitar_gapi_client_id',v);
-  if(v){document.getElementById('configBanner').classList.add('hidden');initTokenClient();}
-}
+const OAUTH_CLIENT_ID = '243777315476-f1tiqc8junjf88mnc1msp3odj77map2g.apps.googleusercontent.com';
+function getClientId(){ return OAUTH_CLIENT_ID; }
+function saveClientId(){ /* Client ID is hardcoded — no-op */ }
 function setStatus(text,st){
   document.getElementById('statusText').textContent=text;
   document.getElementById('statusDot').className='sdot'+(st==='ok'?' ok':st==='busy'?' busy':'');
@@ -1872,53 +2126,74 @@ function toast(msg,icon,color){
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 /* ═══════════════════════════════════════════════════════════════
-   STUDENT DATABASE
+   STUDENT DATABASE — loaded live from USERS tab
+   Falls back to localStorage cache if offline or not yet signed in.
+   Sheet: 1h5EXqBDXVtxNkYWooC5oLgZ54LCoauE8Siuryq-QX4w
+   Columns: A=Email, B=Name, C=Grade, D=Class
    ═══════════════════════════════════════════════════════════════ */
-const STUDENT_DB = [
-  {email:'rcostello27@hanoverstudents.org',name:'Costello, Ryan',grade:11,cls:'Guitar 1 - 2A - Wade'},
-  {email:'amartin29@hanoverstudents.org',name:'Martin, Aiden',grade:9,cls:'Guitar 1 - 2A - Wade'},
-  {email:'isviridov27@hanoverstudents.org',name:'Sviridov, Ivan',grade:11,cls:'Guitar 1 - 2A - Wade'},
-  {email:'mcostello26@hanoverstudents.org',name:'Costello, Matthew',grade:12,cls:'Guitar 1 - 2B - Harden'},
-  {email:'bdouglas26@hanoverstudents.org',name:'Douglas, Benjamin',grade:12,cls:'Guitar 1 - 2B - Harden'},
-  {email:'jkelliher26@hanoverstudents.org',name:'Kelliher, Jacob',grade:12,cls:'Guitar 1 - 2B - Harden'},
-  {email:'aparker26@hanoverstudents.org',name:'Parker, Anna',grade:12,cls:'Guitar 1 - 2B - Harden'},
-  {email:'mbell26@hanoverstudents.org',name:'Bell, Matthew',grade:12,cls:'Guitar 1 - 5A - Wade'},
-  {email:'fgardner26@hanoverstudents.org',name:'Gardner, Flynn',grade:12,cls:'Guitar 1 - 5A - Wade'},
-  {email:'cgeary26@hanoverstudents.org',name:'Geary, Conlan',grade:12,cls:'Guitar 1 - 5A - Wade'},
-  {email:'choward26@hanoverstudents.org',name:'Howard, Colin',grade:12,cls:'Guitar 1 - 5A - Wade'},
-  {email:'lhurley26@hanoverstudents.org',name:'Hurley, Layla',grade:12,cls:'Guitar 1 - 5A - Wade'},
-  {email:'mleblanc27@hanoverstudents.org',name:'LeBlanc, Martin',grade:11,cls:'Guitar 1 - 5A - Wade'},
-  {email:'jlynch26@hanoverstudents.org',name:'Lynch, Joseph',grade:12,cls:'Guitar 1 - 5A - Wade'},
-  {email:'smahoney26@hanoverstudents.org',name:'Mahoney, Shane',grade:12,cls:'Guitar 1 - 5A - Wade'},
-  {email:'jmcdermod26@hanoverstudents.org',name:'McDermod, James',grade:12,cls:'Guitar 1 - 5A - Wade'},
-  {email:'tmichalski29@hanoverstudents.org',name:'Michalski, Tyler',grade:9,cls:'Guitar 1 - 5A - Wade'},
-  {email:'apatel29@hanoverstudents.org',name:'Patel, Aarav',grade:9,cls:'Guitar 1 - 5A - Wade'},
-  {email:'ebryant28@hanoverstudents.org',name:'Bryant, Evan',grade:10,cls:'Guitar 1 - 6B - Harden'},
-  {email:'bdacosta28@hanoverstudents.org',name:'DaCosta, Benjamin',grade:10,cls:'Guitar 1 - 6B - Harden'},
-  {email:'tdunne28@hanoverstudents.org',name:'Dunne, Thomas',grade:10,cls:'Guitar 1 - 6B - Harden'},
-  {email:'chines29@hanoverstudents.org',name:'Hines, Charles',grade:9,cls:'Guitar 1 - 6B - Harden'},
-  {email:'tkmito28@hanoverstudents.org',name:'Kmito, Tyler',grade:10,cls:'Guitar 1 - 6B - Harden'},
-  {email:'tlamond28@hanoverstudents.org',name:'Lamond, Tristan',grade:10,cls:'Guitar 1 - 6B - Harden'},
-  {email:'alaskos27@hanoverstudents.org',name:'Laskos, Alexander',grade:11,cls:'Guitar 1 - 6B - Harden'},
-  {email:'edelaney29@hanoverstudents.org',name:'Delaney, Ethan',grade:9,cls:'Guitar 1 - 7A - Wade'},
-  {email:'jgonzales27@hanoverstudents.org',name:'Gonzales Aponte, Jeremiah',grade:11,cls:'Guitar 1 - 7A - Wade'},
-  {email:'hhsmusic@hanoverstudents.org',name:'Harden, Matt',grade:12,cls:'Guitar 1 - 7A - Wade'},
-  {email:'tjewson26@hanoverstudents.org',name:'Jewson, Tyler',grade:12,cls:'Guitar 1 - 7A - Wade'},
-  {email:'nnjenga27@hanoverstudents.org',name:'Njenga, Nate',grade:11,cls:'Guitar 2 - 2A - Wade'},
-  {email:'cmurphy28@hanoverstudents.org',name:'Murphy, Cullen',grade:10,cls:'Guitar 2 - 2B - Harden'},
-  {email:'srowsell26@hanoverstudents.org',name:'Rowsell, Sophia',grade:12,cls:'Guitar 2 - 2B - Harden'},
-  {email:'bmortland27@hanoverstudents.org',name:'Mortland, Brady',grade:11,cls:'Guitar 2 - 5A - Wade'},
-  {email:'treimer28@hanoverstudents.org',name:'Reimer, Thomas',grade:10,cls:'Guitar 2 - 5A - Wade'},
-  {email:'bswenson26@hanoverstudents.org',name:'Swenson, Bryce',grade:12,cls:'Guitar 2 - 5A - Wade'},
-  {email:'mfreeman27@hanoverstudents.org',name:'Freeman, Mila',grade:11,cls:'Guitar 1 - 2A - Wade'},
-  {email:'tsullivan26@hanoverstudents.org',name:'Sullivan, Tim',grade:12,cls:'Guitar 1 - 5A - Wade'},
-  {email:'bpeterson26@hanoverstudents.org',name:'Peterson, Bradley',grade:12,cls:'Guitar 1 - 5A - Wade'},
-  {email:'tleibfarth26@hanoverstudents.org',name:'Leibfarth, Trevor',grade:12,cls:'Guitar 1 - 5A - Wade'},
-  {email:'clloyd27@hanoverstudents.org',name:'Lloyd, Caden',grade:11,cls:'Guitar 1 - 7A - Wade'},
-  {email:'lmonahan29@hanoverstudents.org',name:'Monahan, Liam',grade:9,cls:'Guitar 1 - 6B - Harden'},
-  {email:'jduff27@hanoverstudents.org',name:'Duff, Joseph',grade:11,cls:'Guitar 1 - 7A - Wade'},
-  {email:'dgarufi29@hanoverstudents.org',name:'Garufi, Dom',grade:9,cls:'Guitar 1 -7A - Wade'},
-];
+const USERS_SHEET_ID = '1h5EXqBDXVtxNkYWooC5oLgZ54LCoauE8Siuryq-QX4w';
+const USERS_CACHE_KEY = 'guitar_student_db_cache';
+
+let STUDENT_DB = loadCachedStudents();
+
+function loadCachedStudents(){
+  try{
+    const raw = localStorage.getItem(USERS_CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){ return []; }
+}
+
+function parseUsersRows(rows){
+  // Skip header row, filter out blank rows
+  return rows.slice(1)
+    .filter(r => r[0] && r[1])
+    .map(r => ({
+      email: (r[0]||'').trim(),
+      name:  (r[1]||'').trim(),
+      grade: parseInt(r[2])||'',
+      cls:   (r[3]||'').trim(),
+    }));
+}
+
+async function loadStudentsFromSheet(silent=false){
+  if(!accessToken) return;
+  if(!silent) setStatus('Loading students...','busy');
+  try{
+    const r = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${USERS_SHEET_ID}/values/USERS`,
+      { headers:{ Authorization:'Bearer '+accessToken } }
+    );
+    const data = await r.json();
+    if(!data.values) throw new Error('No data in USERS tab');
+    const students = parseUsersRows(data.values);
+    if(!students.length) throw new Error('No students found');
+    STUDENT_DB = students;
+    localStorage.setItem(USERS_CACHE_KEY, JSON.stringify(students));
+    // Re-render the student bar so the Class dropdown reflects the live class list
+    // and the Teacher dropdown reflects config.teachers — preserve any current selection
+    const currentTeacher = (document.getElementById('teacherName')||{}).value||'';
+    const currentClass   = (document.getElementById('classSelect')||{}).value||'';
+    renderStudentBar();
+    const teacherEl = document.getElementById('teacherName');
+    if(teacherEl && currentTeacher) teacherEl.value = currentTeacher;
+    const classEl = document.getElementById('classSelect');
+    if(classEl && currentClass) classEl.value = currentClass;
+    if(!silent){
+      setStatus('Connected','ok');
+      toast(`${students.length} students loaded from sheet`,'fas fa-users','#27ae60');
+    }
+    updateStudentCountBadge();
+  }catch(e){
+    if(!silent) toast('Could not load students: '+(e.message||e),'fas fa-triangle-exclamation','#e74c3c');
+    console.warn('Student load error',e);
+    if(!silent) setStatus('Connected','ok');
+  }
+}
+
+function updateStudentCountBadge(){
+  const el = document.getElementById('studentCountBadge');
+  if(el) el.textContent = STUDENT_DB.length ? `${STUDENT_DB.length} students` : 'No students loaded';
+}
 
 let selectedStudent = null;
 let signedInEmail = '';
@@ -2205,11 +2480,11 @@ async function sendReportEmail(){
   initState();
   render();
   updateOfflineBadge();
-  const cid=getClientId();
-  if(cid){
-    document.getElementById('clientIdInput').value=cid;
-    document.getElementById('configBanner').classList.add('hidden');
-  }
+  updateSharedSheetBadge();
+  // Apply default assessment name if set by admin
+  const anEl = document.getElementById('assessmentName');
+  if(anEl && config.driveSettings.defaultAssessmentName) anEl.value = config.driveSettings.defaultAssessmentName;
+  // Client ID is hardcoded — initialise token client immediately
   loadGoogleAPIs();
   // Refresh the "last synced X ago" badge text every 15s
   setInterval(updateSyncBadge, 15000);
