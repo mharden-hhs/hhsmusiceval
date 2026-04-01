@@ -203,7 +203,29 @@ body{background:var(--light);font-family:'Lato',sans-serif;margin:0;padding:0;}
 .sb-student-chip button{background:none;border:none;cursor:pointer;color:#66bb6a;font-size:12px;padding:0;line-height:1;margin-left:2px;}
 .sb-student-chip button:hover{color:#e74c3c;}
 
-/* ══ REPORT / EMAIL MODAL ════════════════════════════════════ */
+/* ══ TEMPLATES ═══════════════════════════════════════════════ */
+.tpl-card{border:1.5px solid #e0e0e0;border-radius:10px;padding:13px 15px;margin-bottom:9px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:12px;background:white;}
+.tpl-card:hover{border-color:var(--accent);background:#fffdf5;transform:translateY(-1px);box-shadow:0 3px 10px rgba(0,0,0,.07);}
+.tpl-card.tpl-default{border-color:#a5d6a7;background:#f1f8f1;}
+.tpl-icon{width:38px;height:38px;border-radius:8px;background:var(--dk);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.tpl-icon i{color:var(--accent);font-size:16px;}
+.tpl-name{font-size:14px;font-weight:700;color:var(--dk);}
+.tpl-meta{font-size:11px;color:#888;margin-top:2px;}
+.tpl-actions{margin-left:auto;display:flex;gap:5px;flex-shrink:0;}
+.tpl-empty{text-align:center;padding:28px 16px;color:#aaa;font-size:13px;}
+.tpl-empty i{font-size:32px;display:block;margin-bottom:8px;color:#ddd;}
+
+/* Startup modal overlay */
+.startup-overlay{display:none;position:fixed;inset:0;background:rgba(15,15,30,.75);z-index:4000;align-items:center;justify-content:center;padding:20px;}
+.startup-overlay.open{display:flex;}
+.startup-box{background:white;border-radius:16px;width:100%;max-width:520px;overflow:hidden;box-shadow:0 16px 60px rgba(0,0,0,.3);}
+.startup-hero{background:linear-gradient(135deg,var(--dk),#0f3460);padding:24px 24px 20px;color:white;text-align:center;}
+.startup-hero i{font-size:36px;color:var(--accent);margin-bottom:10px;display:block;}
+.startup-hero h3{margin:0 0 4px;font-size:18px;font-weight:900;}
+.startup-hero p{margin:0;font-size:13px;color:#aaa;}
+.startup-body{padding:20px;}
+
+@media print{.startup-overlay,.tpl-card{display:none!important;}}
 .report-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;}
 .report-overlay.open{display:flex;}
 .report-box{background:white;border-radius:14px;width:100%;max-width:720px;overflow:hidden;box-shadow:0 12px 50px rgba(0,0,0,.25);margin-bottom:30px;}
@@ -308,6 +330,9 @@ body{background:var(--light);font-family:'Lato',sans-serif;margin:0;padding:0;}
   <button class="btn btn-outline-secondary" onclick="newAssessment()"><i class="fas fa-plus"></i> New</button>
   <button class="btn btn-outline-secondary" onclick="clearForm()"><i class="fas fa-rotate-left"></i> Reset</button>
   <button class="btn btn-outline-secondary" onclick="openHistory()"><i class="fas fa-clock-rotate-left"></i> History</button>
+  <button class="btn btn-outline-secondary" onclick="openTemplatePicker()" id="btnTemplates" style="color:#7b1fa2;border-color:#ba68c8;">
+    <i class="fas fa-layer-group"></i> Templates
+  </button>
   <button class="btn btn-outline-primary" onclick="exportCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
   <button class="btn btn-outline-secondary" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
   <button id="btnSaveDrive" class="btn" style="background:#1a73e8;color:white;" onclick="saveToDrive()">
@@ -407,6 +432,7 @@ body{background:var(--light);font-family:'Lato',sans-serif;margin:0;padding:0;}
   <div class="admin-tabs">
     <div class="admin-tab active" onclick="switchTab('sections')"><i class="fas fa-list-check" style="margin-right:5px;"></i>Sections &amp; Items</div>
     <div class="admin-tab" onclick="switchTab('classes')"><i class="fas fa-users" style="margin-right:5px;"></i>Classes &amp; Fields</div>
+    <div class="admin-tab" onclick="switchTab('templates')"><i class="fas fa-layer-group" style="margin-right:5px;"></i>Templates</div>
     <div class="admin-tab" onclick="switchTab('drive')"><i class="fab fa-google-drive" style="margin-right:5px;"></i>Drive Settings</div>
     <div class="admin-tab" onclick="switchTab('settings')"><i class="fas fa-gear" style="margin-right:5px;"></i>Settings</div>
   </div>
@@ -517,6 +543,31 @@ body{background:var(--light);font-family:'Lato',sans-serif;margin:0;padding:0;}
     </div>
     <div style="margin-top:14px;">
       <button class="btn btn-primary" onclick="saveDriveSettings()"><i class="fas fa-check"></i> Save Settings</button>
+    </div>
+  </div>
+
+  <!-- TAB: TEMPLATES -->
+  <div class="admin-section" id="tab-templates">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:var(--dk);">Assessment Templates</div>
+        <div style="font-size:12px;color:#888;margin-bottom:12px;">Save the current form configuration as a reusable template. Templates include sections, items, scoring scale, assessment name, classes, and teachers.</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+      <input type="text" id="newTplName" placeholder="Template name (e.g. Guitar 1 Final)..."
+        style="font-size:13px;border:1px solid #ccc;border-radius:7px;padding:6px 11px;outline:none;flex:1;min-width:200px;"
+        onkeydown="if(event.key==='Enter')saveCurrentAsTemplate()"/>
+      <button class="btn btn-success" onclick="saveCurrentAsTemplate()"><i class="fas fa-floppy-disk"></i> Save current as template</button>
+    </div>
+    <div id="adminTemplateList"></div>
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-outline-primary" onclick="syncTemplatesToSheet()"><i class="fas fa-upload"></i> Push templates to Sheet</button>
+      <button class="btn btn-sm btn-outline-success" onclick="pullTemplatesFromSheet()"><i class="fas fa-download"></i> Pull templates from Sheet</button>
+    </div>
+    <div style="background:#e8f4fd;border-radius:8px;padding:9px 13px;font-size:12px;color:#1a5276;margin-top:10px;">
+      <i class="fas fa-circle-info" style="margin-right:5px;"></i>
+      Templates sync to a <strong>_TEMPLATES</strong> tab in the shared Google Sheet, making them available to all teachers.
     </div>
   </div>
 
@@ -690,6 +741,38 @@ body{background:var(--light);font-family:'Lato',sans-serif;margin:0;padding:0;}
   <div id="histList"></div>
   <button class="btn btn-outline-secondary w-100 mt-3" onclick="closeHistory()">Close</button>
 </div>
+</div>
+
+<!-- ══ STARTUP TEMPLATE PICKER ════════════════════════════════════ -->
+<div class="startup-overlay" id="startupOverlay">
+  <div class="startup-box">
+    <div class="startup-hero">
+      <i class="fas fa-guitar"></i>
+      <h3>Guitar Class Assessment Portal</h3>
+      <p>Choose a template to get started, or build a new one from scratch.</p>
+    </div>
+    <div class="startup-body">
+      <div id="startupTemplateList"></div>
+      <button class="btn btn-outline-secondary w-100 mt-2" onclick="startBlank()" style="font-size:13px;">
+        <i class="fas fa-file" style="margin-right:6px;"></i>Start with a blank canvas
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TEMPLATE PICKER MODAL (toolbar button) ═════════════════════ -->
+<div class="overlay" id="templatePickerModal" onclick="if(event.target===this)closeTemplatePicker()">
+  <div class="modal-box" style="max-width:540px;">
+    <h4><i class="fas fa-layer-group" style="color:#7b1fa2;margin-right:8px;"></i>Load Template</h4>
+    <p class="modal-sub">Select a template to apply to the current form. Student scores will not be affected.</p>
+    <div id="tplPickerList"></div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+      <button class="btn btn-outline-secondary" onclick="closeTemplatePicker()">Cancel</button>
+      <button class="btn btn-outline-secondary ms-auto" onclick="startBlank();closeTemplatePicker()">
+        <i class="fas fa-file"></i> Blank canvas
+      </button>
+    </div>
+  </div>
 </div>
 
 <div class="toast-wrap" id="toastWrap"></div>
@@ -1401,11 +1484,12 @@ function openAdmin(){
   populateAdminSections();
   populateAdminClasses();
   populateDriveSettings();
+  renderAdminTemplateList();
   document.getElementById('adminOverlay').classList.add('open');
 }
 function closeAdmin(){document.getElementById('adminOverlay').classList.remove('open');}
 function switchTab(id){
-  document.querySelectorAll('.admin-tab').forEach((t,i)=>{t.classList.toggle('active',['sections','classes','drive','settings'][i]===id);});
+  document.querySelectorAll('.admin-tab').forEach((t,i)=>{t.classList.toggle('active',['sections','classes','templates','drive','settings'][i]===id);});
   document.querySelectorAll('.admin-section').forEach(s=>{s.classList.toggle('active',s.id==='tab-'+id);});
 }
 
@@ -2548,21 +2632,289 @@ async function sendReportEmail(){
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   TEMPLATE ENGINE
+   Templates are snapshots of: sections, scores, assessment name,
+   classes, teachers. Stored in localStorage + Google Sheet tab.
+   ═══════════════════════════════════════════════════════════════ */
+const TPL_CACHE_KEY  = 'guitar_templates';
+const TPL_SHEET_TAB  = '_TEMPLATES';
+
+function getTemplates(){
+  try{ return JSON.parse(localStorage.getItem(TPL_CACHE_KEY)||'[]'); }
+  catch(e){ return []; }
+}
+function saveTemplates(tpls){
+  localStorage.setItem(TPL_CACHE_KEY, JSON.stringify(tpls));
+}
+
+/* ── Snapshot current config into a template object ─────────── */
+function buildTemplateSnapshot(name){
+  return {
+    id: 'tpl_' + Date.now(),
+    name: name.trim(),
+    savedAt: Date.now(),
+    sections:   JSON.parse(JSON.stringify(config.sections)),
+    scores:     JSON.parse(JSON.stringify(config.scores)),
+    classes:    JSON.parse(JSON.stringify(config.classes)),
+    teachers:   JSON.parse(JSON.stringify(config.teachers||[])),
+    assessmentName: (document.getElementById('assessmentName')||{}).value?.trim()||'',
+  };
+}
+
+/* ── Apply a template snapshot to the current config ─────────── */
+function applyTemplate(tpl, silent=false){
+  config.sections   = JSON.parse(JSON.stringify(tpl.sections));
+  config.scores     = JSON.parse(JSON.stringify(tpl.scores));
+  config.classes    = JSON.parse(JSON.stringify(tpl.classes));
+  config.teachers   = JSON.parse(JSON.stringify(tpl.teachers||[]));
+  saveConfig();
+  initState();
+  render();
+  const anEl = document.getElementById('assessmentName');
+  if(anEl && tpl.assessmentName) anEl.value = tpl.assessmentName;
+  if(!silent) toast(`Template "${tpl.name}" loaded`,'fas fa-layer-group','#7b1fa2');
+}
+
+/* ── Save current form as a new template ──────────────────────── */
+function saveCurrentAsTemplate(){
+  const inp = document.getElementById('newTplName');
+  const name = (inp?.value||'').trim();
+  if(!name){ toast('Enter a template name first','fas fa-triangle-exclamation','#f39c12'); return; }
+  const tpls = getTemplates();
+  const existing = tpls.findIndex(t=>t.name.toLowerCase()===name.toLowerCase());
+  if(existing>=0){
+    showConfirm({
+      title:'Overwrite template?',
+      body:`A template named "<strong>${esc(name)}</strong>" already exists. Replace it with the current form?`,
+      okLabel:'Overwrite', okClass:'btn-warning', icon:'fas fa-layer-group',
+      onOk(){
+        tpls[existing]=buildTemplateSnapshot(name);
+        saveTemplates(tpls);
+        if(inp) inp.value='';
+        renderAdminTemplateList();
+        toast(`Template "${name}" updated`,'fas fa-floppy-disk','#27ae60');
+      }
+    });
+    return;
+  }
+  tpls.unshift(buildTemplateSnapshot(name));
+  saveTemplates(tpls);
+  if(inp) inp.value='';
+  renderAdminTemplateList();
+  toast(`Template "${name}" saved`,'fas fa-floppy-disk','#27ae60');
+}
+
+/* ── Render template list in Admin panel ─────────────────────── */
+function renderAdminTemplateList(){
+  const tpls = getTemplates();
+  const wrap = document.getElementById('adminTemplateList');
+  if(!wrap) return;
+  if(!tpls.length){
+    wrap.innerHTML=`<div class="tpl-empty"><i class="fas fa-layer-group"></i>No templates saved yet.<br/>Build your sections above, then save as a template.</div>`;
+    return;
+  }
+  wrap.innerHTML = tpls.map((tpl,i)=>`
+    <div class="tpl-card">
+      <div class="tpl-icon"><i class="fas fa-layer-group"></i></div>
+      <div style="flex:1;min-width:0;">
+        <div class="tpl-name">${esc(tpl.name)}</div>
+        <div class="tpl-meta">
+          ${tpl.sections.length} section${tpl.sections.length!==1?'s':''} &nbsp;·&nbsp;
+          ${tpl.sections.reduce((a,s)=>a+s.subsections.reduce((b,ss)=>b+ss.items.length,0),0)} items
+          ${tpl.assessmentName?` &nbsp;·&nbsp; "${esc(tpl.assessmentName)}"`:''} &nbsp;·&nbsp;
+          Saved ${new Date(tpl.savedAt).toLocaleDateString()}
+        </div>
+      </div>
+      <div class="tpl-actions">
+        <button class="btn btn-sm btn-outline-primary" onclick="applyTemplateFromAdmin(${i})" title="Load this template"><i class="fas fa-upload"></i> Load</button>
+        <button class="btn btn-sm btn-outline-danger" onclick="deleteTemplate(${i})" title="Delete"><i class="fas fa-trash"></i></button>
+      </div>
+    </div>`).join('');
+}
+
+function applyTemplateFromAdmin(i){
+  const tpl = getTemplates()[i];
+  if(!tpl) return;
+  showConfirm({
+    title:`Load template "${tpl.name}"`,
+    body:'This will replace all current sections and items with those from the template. Student scores will not be affected.',
+    okLabel:'Load template', okClass:'btn-primary', icon:'fas fa-layer-group',
+    onOk(){
+      applyTemplate(tpl);
+      populateAdminSections();
+      populateAdminClasses();
+    }
+  });
+}
+
+function deleteTemplate(i){
+  const tpls = getTemplates();
+  const tpl = tpls[i];
+  if(!tpl) return;
+  showConfirm({
+    title:`Delete template "${tpl.name}"`,
+    body:'This template will be permanently removed from this device.',
+    okLabel:'Delete', okClass:'btn-danger', icon:'fas fa-trash',
+    onOk(){
+      tpls.splice(i,1);
+      saveTemplates(tpls);
+      renderAdminTemplateList();
+      toast(`"${tpl.name}" deleted`,'fas fa-trash','#e74c3c');
+    }
+  });
+}
+
+/* ── Template picker (toolbar button + startup) ───────────────── */
+function openTemplatePicker(){
+  const tpls = getTemplates();
+  const wrap = document.getElementById('tplPickerList');
+  if(!wrap) return;
+  if(!tpls.length){
+    wrap.innerHTML=`<div class="tpl-empty"><i class="fas fa-layer-group"></i>No templates saved yet.<br/>Go to Admin → Templates to create one.</div>`;
+  } else {
+    wrap.innerHTML = tpls.map((tpl,i)=>`
+      <div class="tpl-card" onclick="loadTemplateFromPicker(${i})">
+        <div class="tpl-icon"><i class="fas fa-layer-group"></i></div>
+        <div>
+          <div class="tpl-name">${esc(tpl.name)}</div>
+          <div class="tpl-meta">
+            ${tpl.sections.length} section${tpl.sections.length!==1?'s':''} &nbsp;·&nbsp;
+            ${tpl.sections.reduce((a,s)=>a+s.subsections.reduce((b,ss)=>b+ss.items.length,0),0)} items
+            ${tpl.assessmentName?` &nbsp;·&nbsp; "${esc(tpl.assessmentName)}"`:''}</div>
+        </div>
+        <i class="fas fa-chevron-right" style="color:#ccc;margin-left:auto;font-size:12px;"></i>
+      </div>`).join('');
+  }
+  document.getElementById('templatePickerModal').classList.add('open');
+}
+function closeTemplatePicker(){ document.getElementById('templatePickerModal').classList.remove('open'); }
+function loadTemplateFromPicker(i){
+  const tpl = getTemplates()[i];
+  if(!tpl) return;
+  applyTemplate(tpl);
+  closeTemplatePicker();
+}
+
+/* ── Startup modal ────────────────────────────────────────────── */
+function showStartupPicker(){
+  const tpls = getTemplates();
+  const wrap = document.getElementById('startupTemplateList');
+  if(!wrap) return;
+  if(!tpls.length){
+    wrap.innerHTML=`<div class="tpl-empty" style="padding:12px 0 8px;"><i class="fas fa-layer-group"></i>No templates saved yet.</div>`;
+  } else {
+    wrap.innerHTML = tpls.map((tpl,i)=>`
+      <div class="tpl-card" onclick="loadTemplateFromStartup(${i})">
+        <div class="tpl-icon"><i class="fas fa-layer-group"></i></div>
+        <div>
+          <div class="tpl-name">${esc(tpl.name)}</div>
+          <div class="tpl-meta">
+            ${tpl.sections.length} section${tpl.sections.length!==1?'s':''} &nbsp;·&nbsp;
+            ${tpl.sections.reduce((a,s)=>a+s.subsections.reduce((b,ss)=>b+ss.items.length,0),0)} items
+            ${tpl.assessmentName?` &nbsp;·&nbsp; "${esc(tpl.assessmentName)}"`:''}</div>
+        </div>
+        <i class="fas fa-chevron-right" style="color:#ccc;margin-left:auto;font-size:12px;"></i>
+      </div>`).join('');
+  }
+  document.getElementById('startupOverlay').classList.add('open');
+}
+function closeStartupPicker(){ document.getElementById('startupOverlay').classList.remove('open'); }
+function loadTemplateFromStartup(i){
+  const tpl = getTemplates()[i];
+  if(!tpl) return;
+  applyTemplate(tpl, true);
+  closeStartupPicker();
+  toast(`Template "${tpl.name}" loaded`,'fas fa-layer-group','#7b1fa2');
+}
+function startBlank(){
+  config.sections=[];
+  saveConfig(); initState(); render();
+  closeStartupPicker();
+  closeTemplatePicker();
+  toast('Blank canvas — add sections in Admin','fas fa-file');
+}
+
+/* ── Google Sheet sync ────────────────────────────────────────── */
+async function syncTemplatesToSheet(){
+  if(!accessToken){ toast('Sign in first','fas fa-triangle-exclamation','#e74c3c'); return; }
+  const sharedId = getSharedSheetId();
+  if(!sharedId){ toast('No shared sheet configured','fas fa-triangle-exclamation','#f39c12'); return; }
+  setStatus('Syncing templates...','busy');
+  try{
+    const tpls = getTemplates();
+    const rows = [['guitar_templates_v1'], [JSON.stringify(tpls)]];
+    await ensureTab(sharedId, TPL_SHEET_TAB);
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sharedId}/values/${encodeURIComponent(TPL_SHEET_TAB)}!A1?valueInputOption=USER_ENTERED`,{
+      method:'PUT',
+      headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+      body:JSON.stringify({range:`${TPL_SHEET_TAB}!A1`,majorDimension:'ROWS',values:rows})
+    });
+    setStatus('Synced','ok');
+    toast(`${tpls.length} template${tpls.length!==1?'s':''} pushed to Sheet`,'fas fa-upload','#27ae60');
+  }catch(e){ setStatus('Error',''); toast('Sync failed: '+(e.message||e),'fas fa-triangle-exclamation','#e74c3c'); }
+}
+
+async function pullTemplatesFromSheet(){
+  if(!accessToken){ toast('Sign in first','fas fa-triangle-exclamation','#e74c3c'); return; }
+  const sharedId = getSharedSheetId();
+  if(!sharedId){ toast('No shared sheet configured','fas fa-triangle-exclamation','#f39c12'); return; }
+  setStatus('Pulling templates...','busy');
+  try{
+    const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sharedId}/values/${encodeURIComponent(TPL_SHEET_TAB)}!A2`,{
+      headers:{Authorization:'Bearer '+accessToken}
+    });
+    const data = await r.json();
+    const raw = data.values?.[0]?.[0];
+    if(!raw) throw new Error('No template data found in sheet');
+    const tpls = JSON.parse(raw);
+    saveTemplates(tpls);
+    renderAdminTemplateList();
+    setStatus('Connected','ok');
+    toast(`${tpls.length} template${tpls.length!==1?'s':''} loaded from Sheet`,'fas fa-download','#27ae60');
+  }catch(e){ setStatus('Error',''); toast('Pull failed: '+(e.message||e),'fas fa-triangle-exclamation','#e74c3c'); }
+}
+
 /* ═══ INIT ══════════════════════════════════════════════════════ */
 (function init(){
   loadConfig();
   syncIntervalSeconds = config.driveSettings.syncInterval || 60;
+
+  // On first install: seed Guitar template and start with blank canvas
+  const hasStoredConfig = !!localStorage.getItem('guitar_config');
+  if(!hasStoredConfig){
+    const builtInTemplate = {
+      id: 'tpl_builtin_guitar',
+      name: 'Guitar 1 — Final Assessment',
+      savedAt: Date.now(),
+      assessmentName: 'Final Assessment',
+      scores:   JSON.parse(JSON.stringify(DEFAULT_CONFIG.scores)),
+      classes:  JSON.parse(JSON.stringify(DEFAULT_CONFIG.classes)),
+      teachers: JSON.parse(JSON.stringify(DEFAULT_CONFIG.teachers||[])),
+      sections: JSON.parse(JSON.stringify(DEFAULT_CONFIG.sections)),
+    };
+    if(!getTemplates().length) saveTemplates([builtInTemplate]);
+    config.sections = [];
+    saveConfig();
+  }
+
   initState();
   render();
   updateOfflineBadge();
   updateSharedSheetBadge();
-  // Apply default assessment name if set by admin
+
   const anEl = document.getElementById('assessmentName');
   if(anEl && config.driveSettings.defaultAssessmentName) anEl.value = config.driveSettings.defaultAssessmentName;
+
   // Client ID is hardcoded — initialise token client immediately
   loadGoogleAPIs();
+
   // Refresh the "last synced X ago" badge text every 15s
   setInterval(updateSyncBadge, 15000);
+
+  // Show startup template picker only when there are no sections to work with
+  // — i.e. fresh install, or after a blank reset. Refreshing mid-session is unaffected.
+  if(config.sections.length === 0) setTimeout(showStartupPicker, 300);
 })();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
