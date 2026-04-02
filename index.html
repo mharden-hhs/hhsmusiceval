@@ -1562,8 +1562,15 @@ function loadHistory(key){
   try{
     const d=JSON.parse(localStorage.getItem(key)); if(!d)return;
 
+    // DEBUG — remove after confirming fix
+    console.log('loadHistory: key=', key);
+    console.log('loadHistory: d.template=', d.template);
+    console.log('loadHistory: d.template?.sections?.length=', d.template?.sections?.length);
+    console.log('loadHistory: d.state keys=', d.state ? Object.keys(d.state) : 'none');
+
     // 1. Restore template into config and persist it
     if(d.template) restoreTemplateSnapshot(d.template);
+    console.log('loadHistory: config.sections after restore=', config.sections.map(s=>s.title));
 
     // 2. Re-render the form with the restored template sections
     //    Do this BEFORE loading scores so the DOM items exist
