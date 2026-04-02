@@ -2432,7 +2432,29 @@ async function upsertStudentRow(spreadsheetId, tabName){
 /* ── Main save function ──────────────────────────────────────── */
 let _pendingSaveAfterName = false; // flag to retry save after name is entered
 
+/* ── Guard: block save if no student selected, highlight the field ── */
+function requireStudent(){
+  const m = getFormMeta();
+  if(m.studentName && m.studentName.trim()) return true;
+  // Flash the student search field red
+  const inp = document.getElementById('sbInput');
+  if(inp){
+    inp.style.borderColor = '#e74c3c';
+    inp.style.boxShadow  = '0 0 0 2px rgba(231,76,60,.2)';
+    inp.focus();
+    setTimeout(()=>{ inp.style.borderColor=''; inp.style.boxShadow=''; }, 2500);
+  }
+  toast('Please search for and select a student first','fas fa-user-magnifying-glass','#e74c3c');
+  return false;
+}
+
 async function saveToSharedSheet(silent=false){
+  // Block save if no student name
+  if(!silent && !requireStudent()) return false;
+  if(silent){
+    const m = getFormMeta();
+    if(!m.studentName || !m.studentName.trim()) return false;
+  }
   const sharedId = getSharedSheetId();
   if(!sharedId){
     if(!silent) toast('No shared sheet configured. Set it in Admin → Drive Settings.','fas fa-triangle-exclamation','#f39c12');
@@ -2521,8 +2543,16 @@ function checkAutoComplete(){
   const allScored = all.every(i=>(state[i.id]||{}).score!==null);
   if(allScored && !window._autoCompleteFired){
     window._autoCompleteFired = true;
+    const m = getFormMeta();
+    if(!m.studentName || !m.studentName.trim()){
+      // All items scored but no student — prompt
+      toast('Please select a student before saving','fas fa-user-magnifying-glass','#e74c3c');
+      const inp = document.getElementById('sbInput');
+      if(inp){ inp.style.borderColor='#e74c3c'; inp.focus(); setTimeout(()=>inp.style.borderColor='',2500); }
+      window._autoCompleteFired = false; // allow retry once student is selected
+      return;
+    }
     if(!getAssessmentName()){
-      // All items scored but no name yet — prompt the teacher
       promptAssessmentName();
       return;
     }
