@@ -1562,49 +1562,114 @@ function loadHistory(key){
   try{
     const d=JSON.parse(localStorage.getItem(key)); if(!d)return;
 
-    // DEBUG — remove after confirming fix
-    console.log('loadHistory: key=', key);
-    console.log('loadHistory: d.template=', d.template);
-    console.log('loadHistory: d.template?.sections?.length=', d.template?.sections?.length);
-    console.log('loadHistory: d.state keys=', d.state ? Object.keys(d.state) : 'none');
-
-    // 1. Restore template into config and persist it
-    if(d.template) restoreTemplateSnapshot(d.template);
-    console.log('loadHistory: config.sections after restore=', config.sections.map(s=>s.title));
-
-    // 2. Re-render the form with the restored template sections
-    //    Do this BEFORE loading scores so the DOM items exist
-    render();
-
-    // 3. Restore assessment name
-    const anEl=document.getElementById('assessmentName');
-    if(anEl) anEl.value = d.template?.assessmentName || '';
-
-    // 4. Restore student selection and form meta
-    setFormMeta(d);
-
-    // 5. Restore scores into state — getAllItems() now reflects correct template
-    initState();
-    if(d.state) getAllItems().forEach(i=>{ if(d.state[i.id]) state[i.id]=d.state[i.id]; });
-    if(d.sheetId) currentSheetId=d.sheetId;
-
-    // 6. Re-render assessment rows with restored scores and update summary
-    renderAssessment();
-    updateSummary();
-
-    // 7. Write into guitar_current LAST so autoSave() from steps above doesn't overwrite it
-    localStorage.setItem('guitar_current', JSON.stringify({
-      ...d,
-      saved: Date.now(),
-    }));
-
-    closeHistory();
-    const tplName = d.template?.assessmentName ? ` (${d.template.assessmentName})` : '';
-    toast(`Assessment loaded${tplName}`,'fas fa-folder-open');
+    if(d.template && d.template.sections && d.template.sections.length){
+      // History entry has a template snapshot — load directly
+      _applyHistoryEntry(d);
+    } else {
+      // Old entry with no template snapshot — ask teacher which template to use
+      closeHistory();
+      _promptTemplateForHistory(key, d);
+    }
   }catch(e){
     console.error('loadHistory error', e);
     toast('Error loading','fas fa-triangle-exclamation','#e74c3c');
   }
+}
+
+function _promptTemplateForHistory(key, d){
+  const tpls = getTemplates();
+  const student = d.studentName || 'this student';
+
+  // Build picker modal content into the confirmModal re-using its structure,
+  // or use a dedicated inner modal inside histModal
+  const wrap = document.getElementById('histList');
+  if(!wrap) return;
+
+  const tplCards = tpls.length
+    ? tpls.map((tpl,i)=>`
+        <div class="tpl-card" onclick="_loadHistoryWithTemplate('${key}',${i})" style="cursor:pointer;">
+          <div class="tpl-icon"><i class="fas fa-layer-group"></i></div>
+          <div>
+            <div class="tpl-name">${esc(tpl.name)}</div>
+            <div class="tpl-meta">${tpl.sections.length} section${tpl.sections.length!==1?'s':''} &nbsp;·&nbsp; ${tpl.sections.reduce((a,s)=>a+s.subsections.reduce((b,ss)=>b+ss.items.length,0),0)} items</div>
+          </div>
+          <i class="fas fa-chevron-right" style="color:#ccc;margin-left:auto;font-size:12px;"></i>
+        </div>`).join('')
+    : '<div class="tpl-empty"><i class="fas fa-layer-group"></i>No templates saved yet. Go to Admin → Templates to create one.</div>';
+
+  wrap.innerHTML = `
+    <div style="margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:4px;">
+        <i class="fas fa-triangle-exclamation" style="color:#f39c12;margin-right:6px;"></i>Select a template
+      </div>
+      <div style="font-size:12px;color:#888;">
+        This saved assessment was created before templates were tracked.
+        Choose which template to use for <strong>${esc(student)}</strong>'s scores:
+      </div>
+    </div>
+    ${tplCards}
+    <button class="btn btn-outline-secondary w-100 mt-3" onclick="_loadHistoryWithCurrentTemplate('${key}')">
+      <i class="fas fa-check"></i> Use current template (${esc(config.sections.map(s=>s.title).join(', ')||'active form')})
+    </button>
+    <button class="btn btn-outline-secondary w-100 mt-2" onclick="openHistory()" style="font-size:12px;">
+      <i class="fas fa-arrow-left"></i> Back to history
+    </button>`;
+
+  document.getElementById('histModal').classList.add('open');
+}
+
+function _loadHistoryWithTemplate(key, tplIndex){
+  const d = JSON.parse(localStorage.getItem(key));
+  const tpl = getTemplates()[tplIndex];
+  if(!d || !tpl) return;
+  // Inject the chosen template into the history entry
+  d.template = buildTemplateSnapshot(tpl.name);
+  d.template.sections = JSON.parse(JSON.stringify(tpl.sections));
+  d.template.scores   = JSON.parse(JSON.stringify(tpl.scores));
+  d.template.classes  = JSON.parse(JSON.stringify(tpl.classes));
+  d.template.teachers = JSON.parse(JSON.stringify(tpl.teachers||[]));
+  d.template.courses  = JSON.parse(JSON.stringify(tpl.courses||[]));
+  d.template.branding = JSON.parse(JSON.stringify(tpl.branding||config.branding||DEFAULT_CONFIG.branding));
+  _applyHistoryEntry(d);
+}
+
+function _loadHistoryWithCurrentTemplate(key){
+  const d = JSON.parse(localStorage.getItem(key));
+  if(!d) return;
+  // Use whatever template is currently active
+  d.template = captureTemplateSnapshot();
+  _applyHistoryEntry(d);
+}
+
+function _applyHistoryEntry(d){
+  // 1. Restore template into config
+  if(d.template && d.template.sections) restoreTemplateSnapshot(d.template);
+
+  // 2. Render with restored template so DOM sections exist
+  render();
+
+  // 3. Restore assessment name
+  const anEl = document.getElementById('assessmentName');
+  if(anEl) anEl.value = d.template?.assessmentName || d.assessmentName || '';
+
+  // 4. Restore student and form meta
+  setFormMeta(d);
+
+  // 5. Init state then restore scores
+  initState();
+  if(d.state) getAllItems().forEach(i=>{ if(d.state[i.id]) state[i.id]=d.state[i.id]; });
+  if(d.sheetId) currentSheetId=d.sheetId;
+
+  // 6. Re-render with scores and update summary
+  renderAssessment();
+  updateSummary();
+
+  // 7. Write to guitar_current LAST — prevents autoSave overwriting during steps above
+  localStorage.setItem('guitar_current', JSON.stringify({ ...d, saved: Date.now() }));
+
+  closeHistory();
+  const tplName = d.template?.assessmentName ? ` (${d.template.assessmentName})` : '';
+  toast(`Assessment loaded${tplName}`, 'fas fa-folder-open');
 }
 function deleteHistory(key,btn){
   localStorage.removeItem(key);
