@@ -1424,12 +1424,44 @@ window.addEventListener('beforeunload', e => {
 });
 
 /* ═══ LOCAL STORAGE ════════════════════════════════════════════ */
+
+/* Build a lightweight snapshot of the current template for storage */
+function captureTemplateSnapshot(){
+  return {
+    sections: JSON.parse(JSON.stringify(config.sections)),
+    scores:   JSON.parse(JSON.stringify(config.scores)),
+    classes:  JSON.parse(JSON.stringify(config.classes)),
+    teachers: JSON.parse(JSON.stringify(config.teachers||[])),
+    courses:  JSON.parse(JSON.stringify(config.courses||[])),
+    branding: JSON.parse(JSON.stringify(config.branding||DEFAULT_CONFIG.branding)),
+    assessmentName: (document.getElementById('assessmentName')||{}).value?.trim()||'',
+  };
+}
+
+/* Restore a template snapshot into config and re-render */
+function restoreTemplateSnapshot(snap){
+  if(!snap) return;
+  if(snap.sections)  config.sections  = snap.sections;
+  if(snap.scores)    config.scores    = snap.scores;
+  if(snap.classes)   config.classes   = snap.classes;
+  if(snap.teachers)  config.teachers  = snap.teachers;
+  if(snap.courses)   config.courses   = snap.courses;
+  if(snap.branding)  config.branding  = snap.branding;
+  saveConfig();
+}
+
 function autoSave(){
   const badge=document.getElementById('saveBadge');
   badge.style.display='inline-flex';
   setTimeout(()=>badge.style.display='none',1800);
   try{
-    const data={...getFormMeta(),state:JSON.parse(JSON.stringify(state)),sheetId:currentSheetId,saved:Date.now()};
+    const data={
+      ...getFormMeta(),
+      state: JSON.parse(JSON.stringify(state)),
+      sheetId: currentSheetId,
+      saved: Date.now(),
+      template: captureTemplateSnapshot(),
+    };
     localStorage.setItem('guitar_current',JSON.stringify(data));
   }catch(e){}
   markDirty();
@@ -1438,7 +1470,13 @@ function autoSave(){
 function saveToHistory(){
   try{
     const id='guitar_hist_'+Date.now();
-    const data={...getFormMeta(),state:JSON.parse(JSON.stringify(state)),sheetId:currentSheetId,saved:Date.now()};
+    const data={
+      ...getFormMeta(),
+      state: JSON.parse(JSON.stringify(state)),
+      sheetId: currentSheetId,
+      saved: Date.now(),
+      template: captureTemplateSnapshot(),
+    };
     localStorage.setItem(id,JSON.stringify(data));
     const keys=JSON.parse(localStorage.getItem('guitar_hist_keys')||'[]');
     keys.unshift(id);
@@ -1451,11 +1489,19 @@ function restoreFromStorage(){
     const raw=localStorage.getItem('guitar_current');
     if(!raw)return;
     const data=JSON.parse(raw);
+    // Restore template first so sections/items exist before loading scores
+    if(data.template) restoreTemplateSnapshot(data.template);
     setFormMeta(data);
     if(data.state)getAllItems().forEach(i=>{if(data.state[i.id])state[i.id]=data.state[i.id];});
     if(data.sheetId)currentSheetId=data.sheetId;
+    // Restore assessment name
+    if(data.template?.assessmentName){
+      const anEl=document.getElementById('assessmentName');
+      if(anEl) anEl.value=data.template.assessmentName;
+    }
     renderAssessment();
     updateSummary();
+    applyBranding();
   }catch(e){}
 }
 function _doReset(){
@@ -1495,13 +1541,17 @@ function openHistory(){
   else{
     list.innerHTML=keys.map(k=>{
       try{
-        const d=JSON.parse(localStorage.getItem(k));if(!d)return'';
-        const nm=config.metaFields.find(f=>f.id==='studentName');
-        const student=nm&&d[nm.id]?d[nm.id]:'Unnamed';
-        const cls=d.classSelect||'';
-        const dt=d.assessDate||new Date(d.saved).toLocaleDateString();
+        const d=JSON.parse(localStorage.getItem(k)); if(!d)return'';
+        const student = d.studentName||'Unnamed';
+        const cls     = d.classSelect||'';
+        const dt      = d.assessDate||new Date(d.saved).toLocaleDateString();
+        const tplName = d.template?.assessmentName || '';
+        const meta2   = [cls, dt, tplName].filter(Boolean).join(' · ');
         return `<div class="hist-row">
-          <div><div class="hist-name">${esc(student)}</div><div class="hist-meta">${esc(cls)} · ${dt}</div></div>
+          <div>
+            <div class="hist-name">${esc(student)}</div>
+            <div class="hist-meta">${esc(meta2)}</div>
+          </div>
           <button class="btn btn-sm btn-outline-primary" onclick="loadHistory('${k}')">Load</button>
           <button class="btn btn-sm btn-outline-danger" onclick="deleteHistory('${k}',this)"><i class="fas fa-trash"></i></button>
         </div>`;
@@ -1513,13 +1563,26 @@ function openHistory(){
 function closeHistory(){document.getElementById('histModal').classList.remove('open');}
 function loadHistory(key){
   try{
-    const d=JSON.parse(localStorage.getItem(key));if(!d)return;
-    initState();setFormMeta(d);
-    if(d.state)getAllItems().forEach(i=>{if(d.state[i.id])state[i.id]=d.state[i.id];});
-    if(d.sheetId)currentSheetId=d.sheetId;
-    renderAssessment();updateSummary();closeHistory();
-    toast('Assessment loaded','fas fa-folder-open');
-  }catch(e){toast('Error loading','fas fa-triangle-exclamation','#e74c3c');}
+    const d=JSON.parse(localStorage.getItem(key)); if(!d)return;
+    // Restore the template first — sections, scores, branding
+    if(d.template){
+      restoreTemplateSnapshot(d.template);
+      render(); // re-render with restored template before loading scores
+      applyBranding();
+      // Restore assessment name from template snapshot
+      if(d.template.assessmentName){
+        const anEl=document.getElementById('assessmentName');
+        if(anEl) anEl.value=d.template.assessmentName;
+      }
+    }
+    initState();
+    setFormMeta(d);
+    if(d.state) getAllItems().forEach(i=>{ if(d.state[i.id]) state[i.id]=d.state[i.id]; });
+    if(d.sheetId) currentSheetId=d.sheetId;
+    renderAssessment(); updateSummary(); closeHistory();
+    const tplName = d.template?.assessmentName ? ` (${d.template.assessmentName})` : '';
+    toast(`Assessment loaded${tplName}`,'fas fa-folder-open');
+  }catch(e){ toast('Error loading','fas fa-triangle-exclamation','#e74c3c'); }
 }
 function deleteHistory(key,btn){
   localStorage.removeItem(key);
