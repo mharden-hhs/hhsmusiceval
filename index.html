@@ -463,6 +463,14 @@ body{background:var(--light);font-family:'Lato',sans-serif;margin:0;padding:0;}
 
   <!-- TAB: CLASSES -->
   <div class="admin-section" id="tab-classes">
+    <div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:4px;">Course List</div>
+    <div style="font-size:12px;color:#888;margin-bottom:10px;">These appear in the Course dropdown on the assessment form.</div>
+    <div id="courseTagsWrap" style="margin-bottom:10px;min-height:36px;"></div>
+    <div style="display:flex;gap:7px;align-items:center;margin-bottom:20px;">
+      <input type="text" id="newCourseInput" placeholder="Course name (e.g. Piano)" style="font-size:13px;border:1px solid #ccc;border-radius:6px;padding:5px 9px;outline:none;width:200px;" onkeydown="if(event.key==='Enter')addCourse()"/>
+      <button class="btn btn-sm btn-success" onclick="addCourse()"><i class="fas fa-plus"></i> Add</button>
+    </div>
+
     <div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:4px;">Teacher List</div>
     <div style="font-size:12px;color:#888;margin-bottom:10px;">These appear in the Teacher dropdown on the assessment form.</div>
     <div id="teacherTagsWrap" style="margin-bottom:10px;min-height:36px;"></div>
@@ -580,9 +588,37 @@ body{background:var(--light);font-family:'Lato',sans-serif;margin:0;padding:0;}
 
   <!-- TAB: SETTINGS -->
   <div class="admin-section" id="tab-settings">
-    <div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:14px;">Admin Settings</div>
+    <div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:14px;">Branding</div>
     <div class="drive-cfg-row">
-      <label><i class="fas fa-lock" style="margin-right:5px;color:#aaa;"></i>Admin PIN</label>
+      <label><i class="fas fa-heading" style="margin-right:5px;color:#aaa;"></i>App Name</label>
+      <input type="text" id="brandingAppName" placeholder="e.g. Music Department Assessment Portal"/>
+    </div>
+    <div class="drive-cfg-row">
+      <label><i class="fas fa-text-slash" style="margin-right:5px;color:#aaa;"></i>Subtitle</label>
+      <input type="text" id="brandingSubtitle" placeholder="e.g. Assessment Portal"/>
+    </div>
+    <div class="drive-cfg-row">
+      <label><i class="fas fa-school" style="margin-right:5px;color:#aaa;"></i>School Name</label>
+      <input type="text" id="brandingSchool" placeholder="e.g. Hanover School"/>
+    </div>
+    <div class="drive-cfg-row">
+      <label><i class="fas fa-icons" style="margin-right:5px;color:#aaa;"></i>Header Icon</label>
+      <select id="brandingIcon" style="font-size:13px;border:1px solid #e0e0e0;border-radius:6px;padding:5px 9px;outline:none;">
+        <option value="fas fa-music">🎵 Music (default)</option>
+        <option value="fas fa-guitar">🎸 Guitar</option>
+        <option value="fas fa-drum">🥁 Drum / Band</option>
+        <option value="fas fa-microphone">🎤 Vocal / Chorus</option>
+        <option value="fas fa-piano-keys">🎹 Piano</option>
+        <option value="fas fa-violin">🎻 Strings</option>
+        <option value="fas fa-star">⭐ Star</option>
+      </select>
+      <span id="brandingIconPreview" style="font-size:20px;margin-left:10px;color:var(--accent);"></span>
+    </div>
+    <div style="margin-top:4px;margin-bottom:16px;">
+      <button class="btn btn-primary" onclick="saveBranding()"><i class="fas fa-check"></i> Apply Branding</button>
+    </div>
+    <hr style="margin:14px 0;"/>
+    <div style="font-size:14px;font-weight:700;color:var(--dk);margin-bottom:14px;">Admin PIN</div>
       <input type="password" id="newPinInput" placeholder="Enter new 4-digit PIN" maxlength="4" style="width:160px;letter-spacing:4px;font-size:16px;text-align:center;"/>
       <button class="btn btn-sm btn-outline-primary ms-2" onclick="saveNewPin()"><i class="fas fa-check"></i> Update PIN</button>
     </div>
@@ -839,6 +875,12 @@ body{background:var(--light);font-family:'Lato',sans-serif;margin:0;padding:0;}
    DEFAULT CONFIG — all editable via admin panel
    ═══════════════════════════════════════════════════════ */
 const DEFAULT_CONFIG = {
+  branding:{
+    appName:'Music Department Assessment Portal',
+    appSubtitle:'Assessment Portal',
+    schoolName:'Hanover School',
+    icon:'fas fa-music',
+  },
   sections:[
     { id:'chords', title:'Chord Shapes', icon:'fas fa-hand-back-fist',
       subsections:[
@@ -884,9 +926,11 @@ const DEFAULT_CONFIG = {
   ],
   classes:['1A','2A','1B','5B'],
   teachers:['Wade','Harden'],
+  courses:['Guitar 1','Guitar 2','Piano','Symphonic Band','Vox Chorus','Concert Chorus'],
   metaFields:[
     {id:'studentName',label:'Student',type:'text',placeholder:'Student name...',width:'190px',required:true},
     {id:'classSelect',label:'Class',type:'select',width:'120px',required:true},
+    {id:'courseSelect',label:'Course',type:'courseselect',width:'170px',required:false},
     {id:'assessDate',label:'Date',type:'date',width:'145px',required:false},
     {id:'teacherName',label:'Teacher',type:'select',placeholder:'',width:'140px',required:false},
   ],
@@ -908,6 +952,21 @@ function loadConfig(){
 }
 function saveConfig(){
   localStorage.setItem('guitar_config', JSON.stringify(config));
+}
+function applyBranding(){
+  const b = config.branding || DEFAULT_CONFIG.branding;
+  const name     = b.appName    || 'Music Department Assessment Portal';
+  const subtitle = b.appSubtitle|| 'Assessment Portal';
+  const icon     = b.icon       || 'fas fa-music';
+  // Header
+  const nameEl = document.getElementById('brandName');     if(nameEl) nameEl.textContent = name;
+  const subEl  = document.getElementById('brandSub');      if(subEl)  subEl.textContent  = subtitle;
+  const iconEl = document.getElementById('defaultIcon');   if(iconEl) iconEl.className   = icon+' default-icon';
+  // Page title
+  document.title = name;
+  // Startup modal
+  const stEl = document.querySelector('.startup-hero h3'); if(stEl) stEl.textContent = name;
+  const stIcEl = document.querySelector('.startup-hero i.fas,i.fab'); if(stIcEl) stIcEl.className = icon+' startup-icon';
 }
 
 /* ═══ STATE ════════════════════════════════════════════════════ */
@@ -947,7 +1006,13 @@ function renderStudentBar(){
           <div class="sb-dropdown" id="sbDropdown"></div>
         </div>`;
     }
-    // Teacher field — rendered as its own dropdown from config.teachers list
+    // Course field — dropdown from config.courses list
+    if(f.id === 'courseSelect'){
+      const opts = (config.courses||[]).map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+      const input = `<select id="courseSelect" onchange="autoSave()" style="width:${f.width||'170px'}"><option value="">Select course...</option>${opts}</select>`;
+      return `<label><i class="fas fa-book-open-reader" style="color:#bbb;margin-right:4px;font-size:11px;"></i>${esc(f.label)}</label>${input}`;
+    }
+    // Teacher field — dropdown from config.teachers list
     if(f.id === 'teacherName'){
       const opts = (config.teachers||[]).map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
       const input = `<select id="teacherName" onchange="autoSave()" style="width:${f.width||'140px'}"><option value="">Select teacher...</option>${opts}</select>`;
@@ -1145,6 +1210,7 @@ function render(){
   renderAssessment();
   updateSummary();
   restoreFromStorage();
+  applyBranding();
 }
 
 /* ═══ STATE MUTATIONS ══════════════════════════════════════════ */
@@ -1522,7 +1588,30 @@ function openAdmin(){
   populateAdminClasses();
   populateDriveSettings();
   renderAdminTemplateList();
+  populateBranding();
   document.getElementById('adminOverlay').classList.add('open');
+}
+function populateBranding(){
+  const b = config.branding || DEFAULT_CONFIG.branding;
+  const nm = document.getElementById('brandingAppName');   if(nm) nm.value = b.appName||'';
+  const sb = document.getElementById('brandingSubtitle');  if(sb) sb.value = b.appSubtitle||'';
+  const sc = document.getElementById('brandingSchool');    if(sc) sc.value = b.schoolName||'';
+  const ic = document.getElementById('brandingIcon');      if(ic){ ic.value = b.icon||'fas fa-music'; updateIconPreview(); }
+}
+function updateIconPreview(){
+  const ic = document.getElementById('brandingIcon');
+  const pr = document.getElementById('brandingIconPreview');
+  if(ic && pr) pr.className = ic.value;
+}
+function saveBranding(){
+  if(!config.branding) config.branding={};
+  config.branding.appName    = (document.getElementById('brandingAppName')?.value||'').trim() || 'Music Department Assessment Portal';
+  config.branding.appSubtitle= (document.getElementById('brandingSubtitle')?.value||'').trim() || 'Assessment Portal';
+  config.branding.schoolName = (document.getElementById('brandingSchool')?.value||'').trim()   || 'Hanover School';
+  config.branding.icon       = document.getElementById('brandingIcon')?.value || 'fas fa-music';
+  saveConfig();
+  applyBranding();
+  toast('Branding updated','fas fa-check-circle','#27ae60');
 }
 function closeAdmin(){document.getElementById('adminOverlay').classList.remove('open');}
 function switchTab(id){
@@ -1649,6 +1738,7 @@ function setupDragDrop(){
 
 /* ── CLASSES BUILDER ───────────────────────────────────────── */
 function populateAdminClasses(){
+  renderCoursesTags();
   renderTeacherTags();
   renderClassTags();
   const mf=document.getElementById('metaFieldsBuilder');
@@ -1665,6 +1755,22 @@ function populateAdminClasses(){
         `<button class="btn-icon" onclick="config.metaFields.splice(${i},1);populateAdminClasses()"><i class="fas fa-trash"></i></button>`}
     </div>`).join('');
 }
+function renderCoursesTags(){
+  const wrap = document.getElementById('courseTagsWrap');
+  if(!wrap) return;
+  wrap.innerHTML = (config.courses||[]).map((c,i)=>
+    `<span class="class-tag">${esc(c)}<button onclick="removeCourse(${i})" title="Remove">×</button></span>`
+  ).join('');
+}
+function addCourse(){
+  const inp = document.getElementById('newCourseInput');
+  const v = (inp.value||'').trim();
+  if(!v) return;
+  if(!config.courses) config.courses=[];
+  if(!config.courses.includes(v)) config.courses.push(v);
+  inp.value=''; renderCoursesTags();
+}
+function removeCourse(i){ config.courses.splice(i,1); renderCoursesTags(); }
 function renderTeacherTags(){
   const wrap = document.getElementById('teacherTagsWrap');
   if(!wrap) return;
@@ -2014,8 +2120,8 @@ function signOut(){
    SHARED SHEET INTEGRATION
    ═══════════════════════════════════════════════════════════════
    One shared Google Sheet, one tab per Assessment Name.
-   Each tab has one row per student — upsert on email match.
-   Auto-saves when all items are scored; also saves on manual trigger.
+   Each tab has one row per student-class combo — upsert on email+class match.
+   Students in multiple courses get separate rows (same email, different class).
    ═══════════════════════════════════════════════════════════════ */
 
 function getAssessmentName(){
@@ -2105,16 +2211,21 @@ async function ensureTab(spreadsheetId, tabName){
   return newSheetId;
 }
 
-/* ── Find existing student row in tab (match on email col B) ─── */
-async function findStudentRow(spreadsheetId, tabName, email){
+/* ── Find existing student row in tab (match on email + class) ── */
+async function findStudentRow(spreadsheetId, tabName, email, cls){
   if(!email) return -1;
-  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(tabName)}!B:B`,{
+  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(tabName)}!B:C`,{
     headers:{Authorization:'Bearer '+accessToken}
   });
   const data = await r.json();
   const rows = data.values||[];
   for(let i=1;i<rows.length;i++){
-    if((rows[i][0]||'').toLowerCase()===email.toLowerCase()) return i+1; // 1-indexed sheet row
+    const rowEmail = (rows[i][0]||'').toLowerCase();
+    const rowClass = (rows[i][1]||'').toLowerCase();
+    const emailMatch = rowEmail === email.toLowerCase();
+    // Match on email + class if class is provided; fall back to email-only for backwards compat
+    const classMatch = !cls || !rowClass || rowClass === cls.toLowerCase();
+    if(emailMatch && classMatch) return i+1; // 1-indexed sheet row
   }
   return -1;
 }
@@ -2122,8 +2233,9 @@ async function findStudentRow(spreadsheetId, tabName, email){
 /* ── Core upsert: update existing row or append new one ──────── */
 async function upsertStudentRow(spreadsheetId, tabName){
   const row   = buildSharedRow();
-  const email = row[1];
-  const existingRow = await findStudentRow(spreadsheetId, tabName, email);
+  const email = row[1]; // col B
+  const cls   = row[2]; // col C — class, used to disambiguate multi-course students
+  const existingRow = await findStudentRow(spreadsheetId, tabName, email, cls);
 
   if(existingRow > 0){
     // Update existing row
@@ -2671,8 +2783,8 @@ function buildReportHTML(personalNote){
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
         <span style="font-size:24px;background:#e8b86d;width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#1a1a2e;">G</span>
         <div>
-          <h2>Guitar Class Assessment Report</h2>
-          <p>Hanover School Music Department</p>
+          <h2>${esc((config.branding||DEFAULT_CONFIG.branding).appName||'Assessment Report')}</h2>
+          <p>${esc((config.branding||DEFAULT_CONFIG.branding).schoolName||'Music Department')}</p>
         </div>
       </div>
     </div>
@@ -2692,7 +2804,7 @@ function buildReportHTML(personalNote){
       <div class="rpt-stat"><div class="sn" style="color:#27ae60;">${prof}%</div><div class="sl">Proficient+</div></div>
     </div>
     ${m.comments ? `<div style="padding:10px 22px;font-size:12px;color:#555;background:#fafafa;border-top:1px solid #f0f0f0;"><strong>Overall Comments:</strong> ${esc(m.comments)}</div>` : ''}
-    <div class="rpt-footer">This report was generated by the Hanover School Guitar Assessment App. For questions, please contact your teacher.</div>
+    <div class="rpt-footer">This report was generated by the ${esc((config.branding||DEFAULT_CONFIG.branding).schoolName||'Hanover School')} Assessment Portal. For questions, please contact your teacher.</div>
   </div>`;
 }
 
@@ -2711,8 +2823,9 @@ function prepSendTab(){
   const name  = m.studentName || 'Student';
   const dateStr = m.assessDate||new Date().toISOString().split('T')[0];
   document.getElementById('sendToEmail').value = email;
+  const appName = (config.branding||DEFAULT_CONFIG.branding).appName || 'Assessment Report';
   document.getElementById('sendSubject').value =
-    `Guitar Class Assessment Report - ${name} - ${dateStr}`;
+    `${appName} - ${name} - ${dateStr}`;
   document.getElementById('sendResult').style.display='none';
   const warn = document.getElementById('gmailNotSignedInWarn');
   warn.style.display = accessToken ? 'none' : 'block';
@@ -2854,6 +2967,8 @@ function buildTemplateSnapshot(name){
     scores:     JSON.parse(JSON.stringify(config.scores)),
     classes:    JSON.parse(JSON.stringify(config.classes)),
     teachers:   JSON.parse(JSON.stringify(config.teachers||[])),
+    courses:    JSON.parse(JSON.stringify(config.courses||[])),
+    branding:   JSON.parse(JSON.stringify(config.branding||DEFAULT_CONFIG.branding)),
     assessmentName: (document.getElementById('assessmentName')||{}).value?.trim()||'',
   };
 }
@@ -2864,9 +2979,12 @@ function applyTemplate(tpl, silent=false){
   config.scores     = JSON.parse(JSON.stringify(tpl.scores));
   config.classes    = JSON.parse(JSON.stringify(tpl.classes));
   config.teachers   = JSON.parse(JSON.stringify(tpl.teachers||[]));
+  config.courses    = JSON.parse(JSON.stringify(tpl.courses||config.courses||[]));
+  if(tpl.branding)  config.branding = JSON.parse(JSON.stringify(tpl.branding));
   saveConfig();
   initState();
   render();
+  applyBranding();
   const anEl = document.getElementById('assessmentName');
   if(anEl && tpl.assessmentName) anEl.value = tpl.assessmentName;
   if(!silent) toast(`Template "${tpl.name}" loaded`,'fas fa-layer-group','#7b1fa2');
@@ -3087,6 +3205,8 @@ async function pullTemplatesFromSheet(){
       scores:   JSON.parse(JSON.stringify(DEFAULT_CONFIG.scores)),
       classes:  JSON.parse(JSON.stringify(DEFAULT_CONFIG.classes)),
       teachers: JSON.parse(JSON.stringify(DEFAULT_CONFIG.teachers||[])),
+      courses:  JSON.parse(JSON.stringify(DEFAULT_CONFIG.courses||[])),
+      branding: { appName:'Guitar Class Assessment', appSubtitle:'Assessment Portal', schoolName:'Hanover School', icon:'fas fa-guitar' },
       sections: JSON.parse(JSON.stringify(DEFAULT_CONFIG.sections)),
     };
     if(!getTemplates().length) saveTemplates([builtInTemplate]);
