@@ -1911,6 +1911,7 @@ function checkPin(){
 
 /* ═══ ADMIN PANEL ══════════════════════════════════════════════ */
 function openAdmin(){
+  migrateConfig(); // ensure scales exist before any admin tab tries to use them
   populateAdminSections();
   populateAdminClasses();
   populateDriveSettings();
@@ -2130,10 +2131,11 @@ function saveAndApplyScales(){
 
 /* ── SECTIONS BUILDER ──────────────────────────────────────── */
 function populateAdminSections(){
+  migrateConfig(); // guard: ensure scales exist before building UI
   renderAdminCustomFields();
   const wrap=document.getElementById('sectionsBuilder');
   wrap.innerHTML=config.sections.map((sec,si)=>{
-    const scaleOpts = config.scales.map(s=>`<option value="${s.id}" ${(sec.scaleId||'')=== s.id?'selected':''}>${esc(s.name)}</option>`).join('');
+    const scaleOpts = (config.scales||[]).map(s=>`<option value="${s.id}" ${(sec.scaleId||'')=== s.id?'selected':''}>${esc(s.name)}</option>`).join('');
     return `
     <div class="sec-builder" id="sec-b-${si}">
       <div class="sec-builder-head">
@@ -2158,7 +2160,7 @@ function populateAdminSections(){
           </div>
           <div style="padding:0 0 6px 10px;">
             ${sub.items.map((item,ii)=>{
-              const itemScaleOpts = config.scales.map(s=>`<option value="${s.id}" ${(item.scaleId||'')=== s.id?'selected':''}>${esc(s.name)}</option>`).join('');
+              const itemScaleOpts = (config.scales||[]).map(s=>`<option value="${s.id}" ${(item.scaleId||'')=== s.id?'selected':''}>${esc(s.name)}</option>`).join('');
               return `
               <div class="item-row" draggable="true" data-sec="${si}" data-sub="${subi}" data-item="${ii}">
                 <i class="fas fa-grip-vertical drag-handle"></i>
@@ -2393,7 +2395,7 @@ function importConfig(e){
   r.onload=ev=>{
     try{
       const parsed=JSON.parse(ev.target.result);
-      config=parsed; saveConfig();
+      config=parsed; migrateConfig(); saveConfig();
       initState(); render();
       toast('Config imported & applied','fas fa-upload','#27ae60');
       closeAdmin();
@@ -2480,6 +2482,7 @@ async function pullConfigFromSheet(silent=false){
     if(!raw) throw new Error('Config tab exists but is empty — push settings first');
     config=JSON.parse(raw);
     config.driveSettings.configSheetId = sheetId;
+    migrateConfig(); // ensure scales exist after loading config from sheet
     saveConfig(); initState(); render();
     populateAdminSections(); populateAdminClasses(); populateDriveSettings();
     if(!silent) setStatus('Connected','ok');
