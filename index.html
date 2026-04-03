@@ -203,7 +203,10 @@ body{background:var(--light);font-family:'Lato',sans-serif;margin:0;padding:0;}
 .sb-student-chip button{background:none;border:none;cursor:pointer;color:#66bb6a;font-size:12px;padding:0;line-height:1;margin-left:2px;}
 .sb-student-chip button:hover{color:#e74c3c;}
 
-/* ══ TEMPLATES ═══════════════════════════════════════════════ */
+/* Bootstrap confirm/prompt modals must sit above all custom overlays */
+#confirmModal,
+#assessmentNameModal{ z-index:5000!important; }
+.modal-backdrop{ z-index:4999!important; }
 .tpl-card{border:1.5px solid #e0e0e0;border-radius:10px;padding:13px 15px;margin-bottom:9px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:12px;background:white;}
 .tpl-card:hover{border-color:var(--accent);background:#fffdf5;transform:translateY(-1px);box-shadow:0 3px 10px rgba(0,0,0,.07);}
 .tpl-card.tpl-default{border-color:#a5d6a7;background:#f1f8f1;}
@@ -2605,6 +2608,7 @@ async function saveToSharedSheet(silent=false){
 
 function promptAssessmentName(){
   const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('assessmentNameModal'));
+  document.getElementById('assessmentNameModal').style.zIndex = '5000';
   // Pre-fill with existing value if any
   const inp = document.getElementById('assessmentNameModalInput');
   if(inp){
@@ -2902,6 +2906,8 @@ function showConfirm({ title='Are you sure?', body='', okLabel='Confirm', okClas
   const fresh = okBtn.cloneNode(true);
   okBtn.parentNode.replaceChild(fresh, okBtn);
   const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal'));
+  // Force above all custom overlays (admin=2000, pin=3000, startup=4000)
+  document.getElementById('confirmModal').style.zIndex = '5000';
   fresh.addEventListener('click', ()=>{ modal.hide(); if(onOk) onOk(); });
   modal.show();
 }
@@ -3296,12 +3302,13 @@ function buildTemplateSnapshot(name){
 
 /* ── Apply a template snapshot to the current config ─────────── */
 function applyTemplate(tpl, silent=false){
-  config.sections   = JSON.parse(JSON.stringify(tpl.sections));
-  config.scores     = JSON.parse(JSON.stringify(tpl.scores));
-  config.classes    = JSON.parse(JSON.stringify(tpl.classes));
-  config.teachers   = JSON.parse(JSON.stringify(tpl.teachers||[]));
-  config.courses    = JSON.parse(JSON.stringify(tpl.courses||config.courses||[]));
-  if(tpl.branding)  config.branding = JSON.parse(JSON.stringify(tpl.branding));
+  config.sections     = JSON.parse(JSON.stringify(tpl.sections));
+  config.scores       = JSON.parse(JSON.stringify(tpl.scores));
+  config.classes      = JSON.parse(JSON.stringify(tpl.classes));
+  config.teachers     = JSON.parse(JSON.stringify(tpl.teachers||[]));
+  config.courses      = JSON.parse(JSON.stringify(tpl.courses||config.courses||[]));
+  config.customFields = JSON.parse(JSON.stringify(tpl.customFields||[]));
+  if(tpl.branding)    config.branding = JSON.parse(JSON.stringify(tpl.branding));
   saveConfig();
   initState();
   render();
