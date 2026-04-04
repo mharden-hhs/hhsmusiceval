@@ -3296,6 +3296,8 @@ function closeReportModal(){ document.getElementById('reportModal').classList.re
 function switchReportTab(id){
   document.querySelectorAll('.report-tab').forEach((t,i)=>t.classList.toggle('active',['lookup','preview','send'][i]===id));
   document.querySelectorAll('.report-section').forEach(s=>s.classList.toggle('active',s.id==='rtab-'+id));
+  if(id==='send') prepSendTab();
+  if(id==='preview') buildReportPreview();
 }
 
 /* ═══ STUDENT LOOKUP ════════════════════════════════════════════ */
@@ -3447,19 +3449,29 @@ function buildReportPreview(){
 /* ═══ SEND TAB PREP ═════════════════════════════════════════════ */
 function prepSendTab(){
   const m = getFormMeta();
-  const teacherField = config.metaFields.find(f=>f.id==='teacherName');
-  const teacher = teacherField&&m[teacherField.id]?m[teacherField.id]:'';
-  // Use email from selectedStudent (bar) first, then modal lookup, then blank
-  const email = (selectedStudent||{}).email || m.studentEmail || '';
   const name  = m.studentName || 'Student';
-  const dateStr = m.assessDate||new Date().toISOString().split('T')[0];
+  const dateStr = m.assessDate || new Date().toISOString().split('T')[0];
+
+  // Try sources in priority order for email:
+  // 1. selectedStudent from bar search
+  // 2. studentEmail stored in meta (restored from history)
+  // 3. Name match against STUDENT_DB (typed name without using search)
+  let email = (selectedStudent||{}).email || m.studentEmail || '';
+  if(!email && name && name !== 'Student'){
+    const nameLower = name.toLowerCase();
+    const matched = STUDENT_DB.find(s=>
+      s.name.toLowerCase().includes(nameLower) ||
+      nameLower.includes(s.name.split(',')[0].trim().toLowerCase())
+    );
+    if(matched) email = matched.email;
+  }
+
   document.getElementById('sendToEmail').value = email;
   const appName = (config.branding||DEFAULT_CONFIG.branding).appName || 'Assessment Report';
-  document.getElementById('sendSubject').value =
-    `${appName} - ${name} - ${dateStr}`;
+  document.getElementById('sendSubject').value = `${appName} - ${name} - ${dateStr}`;
   document.getElementById('sendResult').style.display='none';
   const warn = document.getElementById('gmailNotSignedInWarn');
-  warn.style.display = accessToken ? 'none' : 'block';
+  if(warn) warn.style.display = accessToken ? 'none' : 'block';
 }
 
 /* ═══ GMAIL SEND ════════════════════════════════════════════════ */
