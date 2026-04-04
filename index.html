@@ -1104,9 +1104,16 @@ function initState(){
 /* ═══ FORM RENDER ══════════════════════════════════════════════ */
 function renderLegend(){
   const bar = document.getElementById('legendBar');
+  if(!bar) return;
+  migrateConfig();
   const scale = getItemScale({});
+  const PILL_BG = ['var(--s4)','var(--s3)','var(--s2)','var(--s1)','var(--s0)','var(--sna)'];
   bar.innerHTML = '<span style="font-size:11px;color:#888;margin-right:4px;">Score:</span>' +
-    scale.options.map((opt,i)=>`<span class="lpill lp${getScoreClass(i)}">${opt.short} — ${opt.label}</span>`).join('');
+    scale.options.map((opt,i)=>{
+      const bg = PILL_BG[i] || 'var(--s0)';
+      const col = opt.value===null ? '#555' : 'white';
+      return `<span class="lpill" style="background:${bg};color:${col};">${esc(opt.short)} — ${esc(opt.label)}</span>`;
+    }).join('');
 }
 
 function renderStudentBar(){
