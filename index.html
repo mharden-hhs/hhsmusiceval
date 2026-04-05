@@ -7,6 +7,9 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap"/>
+<!-- Load Google APIs statically — dynamic injection is unreliable on Safari/iPad -->
+<script src="https://apis.google.com/js/api.js"></script>
+<script src="https://accounts.google.com/gsi/client"></script>
 <style>
 :root{
   --dk:#1a1a2e;--mid:#16213e;--accent:#e8b86d;--light:#f8f5f0;
@@ -2506,16 +2509,12 @@ const SCOPES='openid profile email https://www.googleapis.com/auth/spreadsheets 
 let tokenClient=null;
 
 function loadGoogleAPIs(){
-  const s1=document.createElement('script');
-  s1.src='https://apis.google.com/js/api.js';
-  s1.onload=()=>{gapi.load('client',initGapiClient);};
-  document.head.appendChild(s1);
-  const s2=document.createElement('script');
-  s2.src='https://accounts.google.com/gsi/client';
-  // Use a short delay after onload — Safari/iPad can fire onload before
-  // google.accounts.oauth2 is fully initialised
-  s2.onload=()=>{ setTimeout(()=>initTokenClient(0), 100); };
-  document.head.appendChild(s2);
+  // Scripts already loaded in <head> — just initialise the clients
+  if(typeof gapi !== 'undefined'){
+    gapi.load('client', initGapiClient);
+  }
+  // GIS: poll until google.accounts.oauth2 is ready (handles Safari timing)
+  initTokenClient(0);
 }
 async function initGapiClient(){
   try{
