@@ -1145,6 +1145,43 @@ function getItemScale(item, sec){
 /* ── Get score button colour class based on option index ─────── */
 const SCORE_COLORS = ['a4','a3','a2','a1','a0','ana'];
 function getScoreClass(optIndex){ return SCORE_COLORS[optIndex] || 'a0'; }
+
+/* ── Generate a spread of hex colours across green→red for any scale length ─
+   The last option (N/A) always gets a neutral grey.
+   All other options are interpolated across: green, teal, blue, amber, orange, red
+   so even a 10-point scale gets distinct colours at every step.             */
+function scaleColors(count){
+  // Full scoring options (all but the last N/A-style option)
+  const scoringCount = count - 1;
+  if(scoringCount <= 0) return ['#bdc3c7'];
+
+  // Colour stops: best → worst
+  const stops = [
+    [39,174,96],   // green  (Mastery / best)
+    [22,160,133],  // teal
+    [41,128,185],  // blue
+    [142,68,173],  // purple
+    [243,156,18],  // amber
+    [230,126,34],  // orange
+    [231,76,60],   // red    (lowest scored)
+  ];
+
+  const colors = [];
+  for(let i=0; i<scoringCount; i++){
+    const t = scoringCount===1 ? 0 : i / (scoringCount-1);
+    // Find which pair of stops to interpolate between
+    const scaled = t * (stops.length-1);
+    const lo = Math.floor(scaled);
+    const hi = Math.min(lo+1, stops.length-1);
+    const f  = scaled - lo;
+    const r  = Math.round(stops[lo][0] + f*(stops[hi][0]-stops[lo][0]));
+    const g  = Math.round(stops[lo][1] + f*(stops[hi][1]-stops[lo][1]));
+    const b  = Math.round(stops[lo][2] + f*(stops[hi][2]-stops[lo][2]));
+    colors.push(`rgb(${r},${g},${b})`);
+  }
+  colors.push('#bdc3c7'); // neutral grey for N/A
+  return colors;
+}
 function saveConfig(){
   localStorage.setItem('guitar_config', JSON.stringify(config));
 }
@@ -1195,12 +1232,12 @@ function renderLegend(){
     .map(id=>config.scales.find(s=>s.id===id))
     .filter(Boolean);
 
-  const PILL_BG = ['var(--s4)','var(--s3)','var(--s2)','var(--s1)','var(--s0)','var(--sna)'];
   const multiScale = usedScales.length > 1;
 
   bar.innerHTML = usedScales.map((scale, si)=>{
+    const colors = scaleColors(scale.options.length);
     const pills = scale.options.map((opt,i)=>{
-      const bg  = PILL_BG[i] || 'var(--s0)';
+      const bg  = colors[i] || '#bdc3c7';
       const col = opt.value===null ? '#555' : 'white';
       return `<span class="lpill" style="background:${bg};color:${col};">${esc(opt.short)} — ${esc(opt.label)}</span>`;
     }).join('');
@@ -1404,12 +1441,15 @@ function makeRow(item, sec){
   if(!state[item.id]) state[item.id]={score:null,comment:'',chordName:''};
   const s=state[item.id];
   const scale = getItemScale(item, sec);
+  const colors = scaleColors(scale.options.length);
   const lbl=item.editable
     ? `${esc(item.label)} <input class="chord-inp" type="text" placeholder="name" value="${esc(s.chordName)}" onchange="setChordName('${item.id}',this.value)"/>`
     : esc(item.label);
   const btns=scale.options.map((opt,i)=>{
     const isSelected = s.score === String(opt.value);
-    return `<button class="sb ${isSelected?getScoreClass(i):''}" onclick="setScore('${item.id}','${opt.value}',this,'${scale.id}')" title="${opt.label}">${esc(opt.short)}</button>`;
+    const col = colors[i] || '#bdc3c7';
+    const style = isSelected ? `background:${col};border-color:${col};color:${opt.value===null?'#555':'white'};` : '';
+    return `<button class="sb" style="${style}" onclick="setScore('${item.id}','${opt.value}',this,'${scale.id}')" title="${opt.label}">${esc(opt.short)}</button>`;
   }).join('');
   return `<div class="a-row">
     <div class="row-lbl">${lbl}</div>
@@ -1448,16 +1488,19 @@ function render(){
 /* ═══ STATE MUTATIONS ══════════════════════════════════════════ */
 function setScore(id, val, btn, scaleId){
   if(!state[id]) state[id]={score:null,comment:'',chordName:''};
-  // Toggle off if clicking the same score
   state[id].score = state[id].score===String(val) ? null : String(val);
-  // Re-render just the button group with correct highlighting
   const c = document.getElementById('btns-'+id);
   if(c){
     const sid = scaleId || c.getAttribute('data-scale') || config.defaultScaleId;
     const scale = config.scales.find(s=>s.id===sid) || getItemScale({});
+    const colors = scaleColors(scale.options.length);
     c.querySelectorAll('.sb').forEach((b,i)=>{
       const opt = scale.options[i];
-      b.className = 'sb ' + (opt && state[id].score===String(opt.value) ? getScoreClass(i) : '');
+      const isSelected = opt && state[id].score===String(opt.value);
+      const col = colors[i] || '#bdc3c7';
+      b.style.cssText = isSelected
+        ? `background:${col};border-color:${col};color:${opt.value===null?'#555':'white'};`
+        : '';
     });
   }
   updateSummary(); autoSave(); checkAutoComplete();
@@ -3922,9 +3965,9 @@ function buildReportHTML(personalNote){
         const itemSec = config.sections.find(sec=>sec.subsections.some(ss=>ss.items.some(it=>it.id===item.id)));
         const scale = getItemScale(item, itemSec);
         const opt = scoreVal!==null ? scale.options.find(o=>String(o.value)===String(scoreVal)) : null;
-        const PILL_COLORS = ['#27ae60','#2980b9','#f39c12','#e74c3c','#95a5a6','#bdc3c7'];
+        const colors = scaleColors(scale.options.length);
         const optIdx = opt ? scale.options.indexOf(opt) : -1;
-        const pillColor = optIdx>=0 ? (PILL_COLORS[optIdx]||'#ccc') : '#eee';
+        const pillColor = optIdx>=0 ? (colors[optIdx]||'#ccc') : '#eee';
         const pillStyle = opt ? `background:${pillColor};` : '';
         const pillClass = opt ? 'rpt-score-pill' : 'rpt-score-pill rpt-score-ns';
         const pillText = opt ? `${opt.short} — ${opt.label}` : 'Not assessed';
