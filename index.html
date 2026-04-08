@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>HPS Music Department Assessment Portal</title>
+<title>Guitar Class Assessment Portal</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap"/>
@@ -520,12 +520,8 @@ body{background:var(--light);font-family:'Lato',sans-serif;margin:0;padding:0;}
     <button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:white;border:1px solid rgba(255,255,255,.2);" onclick="closeAdmin()"><i class="fas fa-xmark"></i></button>
   </div>
   <div class="admin-tabs">
-    <div class="admin-tab active" onclick="switchTab('sections')"><i class="fas fa-list-check" style="margin-right:5px;"></i>Sections &amp; Items</div>
-    <div class="admin-tab" onclick="switchTab('classes')"><i class="fas fa-users" style="margin-right:5px;"></i>Classes &amp; Fields</div>
-    <div class="admin-tab" onclick="switchTab('scales')"><i class="fas fa-sliders" style="margin-right:5px;"></i>Scales</div>
-    <div class="admin-tab" onclick="switchTab('templates')"><i class="fas fa-layer-group" style="margin-right:5px;"></i>Templates</div>
-    <div class="admin-tab admin-only-tab" onclick="switchTab('drive')" style="display:none;"><i class="fab fa-google-drive" style="margin-right:5px;"></i>Drive Settings</div>
-    <div class="admin-tab admin-only-tab" onclick="switchTab('settings')" style="display:none;"><i class="fas fa-gear" style="margin-right:5px;"></i>Settings</div>
+    <div class="admin-tab active admin-only-tab" onclick="switchTab('drive')"><i class="fab fa-google-drive" style="margin-right:5px;"></i>Drive Settings</div>
+    <div class="admin-tab admin-only-tab" onclick="switchTab('settings')"><i class="fas fa-gear" style="margin-right:5px;"></i>Settings</div>
     <div class="admin-tab admin-only-tab" id="setupTab" onclick="switchTab('setup')" style="display:none;">
       <i class="fas fa-wand-magic-sparkles" style="margin-right:5px;color:#7b1fa2;"></i>New School Setup
     </div>
@@ -2413,23 +2409,25 @@ function openAdmin(){
 
 function _openAdminModal(isAdmin){
   migrateConfig();
-  // Set modal title and icon
   const titleEl = document.getElementById('adminModalTitle');
   const iconEl  = document.getElementById('adminModalIcon');
   if(titleEl) titleEl.textContent = isAdmin ? 'Admin Panel' : 'Settings';
   if(iconEl)  iconEl.className   = isAdmin ? 'fas fa-shield-halved' : 'fas fa-sliders';
-  // Show/hide admin-only tabs
-  document.querySelectorAll('.admin-only-tab').forEach(t=>t.style.display = isAdmin ? '' : 'none');
-  // Always open on first tab
-  switchTab('sections');
-  // Populate all tabs
-  populateAdminSections();
-  populateAdminClasses();
-  populateAdminScales();
-  renderAdminTemplateList();
+
   if(isAdmin){
+    // Admin modal: only admin-exclusive tabs
+    document.querySelectorAll('.admin-only-tab').forEach(t=>t.style.display='');
+    switchTab('drive');
     populateDriveSettings();
     populateBranding();
+  } else {
+    // Settings modal: only teacher tabs
+    document.querySelectorAll('.admin-only-tab').forEach(t=>t.style.display='none');
+    switchTab('sections');
+    populateAdminSections();
+    populateAdminClasses();
+    populateAdminScales();
+    renderAdminTemplateList();
   }
   document.getElementById('adminOverlay').classList.add('open');
 }
@@ -2488,10 +2486,13 @@ function saveBranding(){
 }
 function closeAdmin(){document.getElementById('adminOverlay').classList.remove('open');}
 function switchTab(id){
-  document.querySelectorAll('.admin-tab').forEach((t,i)=>{t.classList.toggle('active',['sections','classes','scales','templates','drive','settings','setup'][i]===id);});
+  document.querySelectorAll('.admin-tab').forEach(t=>{
+    // Match by the tab's onclick attribute content
+    t.classList.toggle('active', t.getAttribute('onclick')===`switchTab('${id}')`);
+  });
   document.querySelectorAll('.admin-section').forEach(s=>{s.classList.toggle('active',s.id==='tab-'+id);});
   if(id==='scales') populateAdminScales();
-  if(id==='setup') renderSetupStep();
+  if(id==='setup')  renderSetupStep();
 }
 
 /* ── Custom Fields ──────────────────────────────────────────── */
@@ -4609,6 +4610,7 @@ function setupSaveCurrentStep(){
     setupData.adminPin   = document.getElementById('swPin')?.value.trim()||'1234';
   }
   if(step==='sheets'){
+    setupData.domain          = document.getElementById('swDomain')?.value.trim()||'hanoverschools.org';
     setupData.usersSheetId    = document.getElementById('swUsersSheet')?.value.trim()||'';
     setupData.trackingSheetId = document.getElementById('swTrackSheet')?.value.trim()||'';
     setupData.configSheetId   = document.getElementById('swConfigSheet')?.value.trim()||'';
@@ -4666,34 +4668,42 @@ function setupStepIdentity(){
 }
 
 function setupStepSheets(){
+  if(!setupData.domain) setupData.domain = 'hanoverschools.org';
   return `
     <div style="font-size:15px;font-weight:700;color:var(--dk);margin-bottom:4px;"><i class="fab fa-google-drive" style="color:#1a73e8;margin-right:7px;"></i>Google Sheets</div>
     <div style="font-size:12px;color:#888;margin-bottom:18px;">Set up the three Google Sheets this school will use. Each sheet ID is found in its URL: <code style="background:#f5f5f5;padding:1px 5px;border-radius:3px;">docs.google.com/spreadsheets/d/<strong>[ID HERE]</strong>/edit</code></div>
 
+    <div class="drive-cfg-row" style="margin-bottom:14px;">
+      <label><i class="fas fa-building-shield" style="color:#7b1fa2;margin-right:5px;"></i>School Domain</label>
+      <input type="text" id="swDomain" placeholder="e.g. hanoverschools.org" value="${esc(setupData.domain)}"
+        style="font-size:13px;border:1px solid #ccc;border-radius:6px;padding:5px 9px;outline:none;width:220px;"/>
+      <span style="font-size:11px;color:#888;margin-left:8px;">All accounts at this domain will get automatic Editor access to the sheets.</span>
+    </div>
+
     <div class="drive-cfg-row">
       <label><i class="fas fa-users" style="color:#27ae60;margin-right:5px;"></i>Student Database Sheet ID</label>
       <input type="text" id="swUsersSheet" placeholder="Sheet with USERS tab (Email/Name/Grade/Class)" value="${esc(setupData.usersSheetId)}" style="font-size:13px;border:1px solid #ccc;border-radius:6px;padding:5px 9px;outline:none;flex:1;font-family:monospace;"/>
-      <button class="btn btn-sm btn-outline-success ms-2" onclick="setupValidateSheet('swUsersSheet','USERS')"><i class="fas fa-plug"></i> Test</button>
+      <button class="btn btn-sm btn-outline-success ms-2" onclick="setupValidateAndShare('swUsersSheet','USERS')"><i class="fas fa-plug"></i> Test &amp; Share</button>
     </div>
     <div id="swUsersSheetStatus" style="font-size:11px;margin-left:210px;margin-bottom:8px;"></div>
 
     <div class="drive-cfg-row">
       <label><i class="fas fa-table" style="color:#7b1fa2;margin-right:5px;"></i>Class Tracking Sheet ID</label>
       <input type="text" id="swTrackSheet" placeholder="Shared assessment results sheet" value="${esc(setupData.trackingSheetId)}" style="font-size:13px;border:1px solid #ccc;border-radius:6px;padding:5px 9px;outline:none;flex:1;font-family:monospace;"/>
-      <button class="btn btn-sm btn-outline-success ms-2" onclick="setupValidateSheet('swTrackSheet',null)"><i class="fas fa-plug"></i> Test</button>
+      <button class="btn btn-sm btn-outline-success ms-2" onclick="setupValidateAndShare('swTrackSheet',null)"><i class="fas fa-plug"></i> Test &amp; Share</button>
     </div>
     <div id="swTrackSheetStatus" style="font-size:11px;margin-left:210px;margin-bottom:8px;"></div>
 
     <div class="drive-cfg-row">
       <label><i class="fas fa-cloud-arrow-up" style="color:#1a73e8;margin-right:5px;"></i>Config Sheet ID</label>
       <input type="text" id="swConfigSheet" placeholder="Where admin config is stored/synced" value="${esc(setupData.configSheetId)}" style="font-size:13px;border:1px solid #ccc;border-radius:6px;padding:5px 9px;outline:none;flex:1;font-family:monospace;"/>
-      <button class="btn btn-sm btn-outline-success ms-2" onclick="setupValidateSheet('swConfigSheet',null)"><i class="fas fa-plug"></i> Test</button>
+      <button class="btn btn-sm btn-outline-success ms-2" onclick="setupValidateAndShare('swConfigSheet',null)"><i class="fas fa-plug"></i> Test &amp; Share</button>
     </div>
     <div id="swConfigSheetStatus" style="font-size:11px;margin-left:210px;margin-bottom:8px;"></div>
 
-    <div style="background:#fff3cd;border-radius:8px;padding:10px 14px;font-size:12px;color:#856404;margin-top:10px;">
-      <i class="fas fa-triangle-exclamation" style="margin-right:5px;"></i>
-      The signed-in Google account must have <strong>Editor</strong> access to all three sheets. The Tracking and Config sheets can be the same sheet if preferred.
+    <div style="background:#e8f5e9;border-radius:8px;padding:10px 14px;font-size:12px;color:#1b5e20;margin-top:10px;">
+      <i class="fas fa-circle-check" style="margin-right:5px;color:#27ae60;"></i>
+      <strong>Test &amp; Share</strong> validates each sheet is accessible and automatically grants <strong>Editor</strong> access to all <strong>${esc(setupData.domain||'hanoverschools.org')}</strong> accounts — no per-teacher sharing needed.
     </div>`;
 }
 
@@ -4778,6 +4788,7 @@ function setupStepReview(){
       ${row('Student DB Sheet',  setupData.usersSheetId,    !!setupData.usersSheetId)}
       ${row('Tracking Sheet',    setupData.trackingSheetId, !!setupData.trackingSheetId)}
       ${row('Config Sheet',      setupData.configSheetId,   !!setupData.configSheetId)}
+      ${row('School Domain',     setupData.domain,          !!setupData.domain)}
       ${row('Teachers',          setupData.teachers.join(', '), setupData.teachers.length>0)}
       ${row('Courses',           setupData.courses.join(', '),  setupData.courses.length>0)}
       ${row('Classes',           setupData.classes.join(', '),  setupData.classes.length>0)}
@@ -4842,27 +4853,58 @@ function removeSetupTag(key, i){
   renderSetupStep();
 }
 
-async function setupValidateSheet(inputId, requiredTab){
+async function setupValidateAndShare(inputId, requiredTab){
   const id = document.getElementById(inputId)?.value.trim();
-  const statusId = inputId.replace('swU','swU').replace('swT','swT').replace('swC','swC')+'Status';
   const statusEl = document.getElementById(inputId+'Status');
+  const domain = document.getElementById('swDomain')?.value.trim() || setupData.domain || 'hanoverschools.org';
+
   if(!id){ if(statusEl) statusEl.innerHTML='<span style="color:#e74c3c;">Enter a Sheet ID first</span>'; return; }
+  if(!domain){ if(statusEl) statusEl.innerHTML='<span style="color:#e74c3c;">Enter a domain first</span>'; return; }
   if(!accessToken){ if(statusEl) statusEl.innerHTML='<span style="color:#e74c3c;">Sign in to Drive first</span>'; return; }
-  if(statusEl) statusEl.innerHTML='<i class="fas fa-rotate fa-spin" style="color:#aaa;font-size:11px;"></i> Testing…';
+  if(statusEl) statusEl.innerHTML='<i class="fas fa-rotate fa-spin" style="color:#aaa;font-size:11px;"></i> Connecting…';
+
   try{
+    // Step 1: Verify sheet is accessible
     const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties.title`,{
       headers:{Authorization:'Bearer '+accessToken}
     });
     const data = await r.json();
     if(data.error) throw new Error(data.error.message);
     const tabs = (data.sheets||[]).map(s=>s.properties.title);
+
     if(requiredTab && !tabs.includes(requiredTab)){
       if(statusEl) statusEl.innerHTML=`<span style="color:#f39c12;"><i class="fas fa-triangle-exclamation"></i> Accessible but no "${requiredTab}" tab found — make sure the tab exists</span>`;
+      return;
+    }
+
+    // Step 2: Grant domain-wide Editor access via Drive API
+    if(statusEl) statusEl.innerHTML='<i class="fas fa-rotate fa-spin" style="color:#aaa;font-size:11px;"></i> Granting domain access…';
+    const permResp = await fetch(`https://www.googleapis.com/drive/v3/files/${id}/permissions`,{
+      method: 'POST',
+      headers:{ Authorization:'Bearer '+accessToken, 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        type: 'domain',
+        role: 'writer',
+        domain: domain,
+      })
+    });
+    const permData = await permResp.json();
+
+    if(permData.error){
+      // Permission may already exist or be set at a higher level — not a fatal error
+      const msg = permData.error.message||'';
+      const alreadyShared = msg.includes('already') || msg.includes('duplicate') || permData.error.code===409;
+      if(alreadyShared || permData.error.code===403){
+        // 403 means domain sharing may be restricted by Workspace policy — warn but don't block
+        if(statusEl) statusEl.innerHTML=`<span style="color:#f39c12;"><i class="fas fa-triangle-exclamation"></i> Sheet accessible (${tabs.length} tab${tabs.length!==1?'s':''}) — domain sharing may need to be set manually in Google Drive (Workspace policy may restrict API sharing)</span>`;
+      } else {
+        throw new Error(permData.error.message);
+      }
     } else {
-      if(statusEl) statusEl.innerHTML=`<span style="color:#27ae60;"><i class="fas fa-check-circle"></i> ✓ Connected — ${tabs.length} tab${tabs.length!==1?'s':''}: ${tabs.slice(0,4).join(', ')}${tabs.length>4?'…':''}</span>`;
+      if(statusEl) statusEl.innerHTML=`<span style="color:#27ae60;"><i class="fas fa-check-circle"></i> ✓ Connected &amp; shared with <strong>${esc(domain)}</strong> as Editor — ${tabs.length} tab${tabs.length!==1?'s':''}</span>`;
     }
   }catch(e){
-    if(statusEl) statusEl.innerHTML=`<span style="color:#e74c3c;"><i class="fas fa-xmark-circle"></i> ${esc(e.message||'Could not access sheet — check the ID and sharing permissions')}</span>`;
+    if(statusEl) statusEl.innerHTML=`<span style="color:#e74c3c;"><i class="fas fa-xmark-circle"></i> ${esc(e.message||'Could not access sheet — check the ID and permissions')}</span>`;
   }
 }
 
