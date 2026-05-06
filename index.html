@@ -3792,21 +3792,39 @@ function loadStudentRow(row, tabName){
   let itemStart   = 6 + customCount;
   let all         = getAllItems();
 
-  // If the sheet header is available, match the correct template by comparing item labels
-  if(rosterHeader.length > itemStart){
+  // Step 1: Try to match template by assessment name (tabName) — simplest and most reliable
+  const tpls = getTemplates();
+  const normalize = s => s.replace(/\s+name\s*$/i,'').toLowerCase().trim();
+
+  let switchedTemplate = false;
+  const nameMatchTpl = tpls.find(tpl =>
+    tpl.assessmentName && tpl.assessmentName.toLowerCase().trim() === tabName.toLowerCase().trim()
+  );
+  if(nameMatchTpl && nameMatchTpl.sections.length > 0){
+    const currentItems = all.map(i=>i.label);
+    const tplItems = nameMatchTpl.sections.flatMap(s=>s.subsections.flatMap(ss=>ss.items)).map(i=>i.label);
+    // Only switch if the template is different from current
+    if(JSON.stringify(currentItems) !== JSON.stringify(tplItems)){
+      applyTemplate(nameMatchTpl, true);
+      customCount = (config.customFields||[]).length;
+      itemStart   = 6 + customCount;
+      all         = getAllItems();
+      initState();
+      switchedTemplate = true;
+    }
+  }
+
+  // Step 2: If name match didn't work, try header-based matching
+  if(!switchedTemplate && rosterHeader.length > itemStart){
     const headerItems = rosterHeader.slice(itemStart);
     const currentItems = all.map(i=>i.label);
-    // Strip editable suffixes like " name" from header items for matching
-    const normalize = s => s.replace(/\s+name\s*$/i,'').toLowerCase().trim();
     const matches = headerItems.length >= all.length &&
       all.every((item,i) => normalize(headerItems[i]||'') === normalize(item.label));
 
     if(!matches){
-      const tpls = getTemplates();
       const matchingTpl = tpls.find(tpl=>{
         const tplItems = tpl.sections.flatMap(s=>s.subsections.flatMap(ss=>ss.items));
         if(tplItems.length === 0) return false;
-        // Also check custom fields count matches
         const tplCustomCount = (tpl.customFields||[]).length;
         const tplItemStart = 6 + tplCustomCount;
         const tplHeaderItems = rosterHeader.slice(tplItemStart);
@@ -3815,7 +3833,6 @@ function loadStudentRow(row, tabName){
       });
       if(matchingTpl){
         applyTemplate(matchingTpl, true);
-        // Recalculate after template change — custom fields and items may have changed
         customCount = (config.customFields||[]).length;
         itemStart   = 6 + customCount;
         all         = getAllItems();
