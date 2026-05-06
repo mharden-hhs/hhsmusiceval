@@ -3717,7 +3717,9 @@ async function loadTabStudents(sharedId, tabName){
       headers:{Authorization:'Bearer '+accessToken}
     });
     const data=await r.json();
-    const rows=(data.values||[]).slice(1); // skip header
+    const allRows=(data.values||[]);
+    rosterHeader = allRows[0] || []; // capture header for template matching in loadStudentRow
+    const rows=allRows.slice(1);
     if(!rows.length){toast('No student data in this tab yet','fas fa-circle-info');return;}
     document.getElementById('histList').innerHTML=`
       <div style="font-size:12px;color:#888;margin-bottom:8px;">
@@ -3767,6 +3769,27 @@ function loadStudentRow(row, tabName){
   const itemStart   = 6 + customCount;
   const all         = getAllItems();
 
+  // If the sheet header is available, check if the current template's items match it.
+  // If not, try to find a saved template whose items do match.
+  if(rosterHeader.length > itemStart){
+    const headerItems = rosterHeader.slice(itemStart, itemStart + all.length);
+    const currentItems = all.map(i=>i.label);
+    const matches = headerItems.every((h,i) => currentItems[i] && currentItems[i].toLowerCase()===h.toLowerCase());
+    if(!matches){
+      // Find a template whose items match the sheet header
+      const tpls = getTemplates();
+      const matchingTpl = tpls.find(tpl=>{
+        const tplItems = tpl.sections.flatMap(s=>s.subsections.flatMap(ss=>ss.items)).map(i=>i.label);
+        return headerItems.every((h,i)=> tplItems[i] && tplItems[i].toLowerCase()===h.toLowerCase());
+      });
+      if(matchingTpl){
+        applyTemplate(matchingTpl, true);
+        // Re-initialise state after template change
+        initState();
+      }
+    }
+  }
+
   all.forEach((item, i)=>{
     const raw = row[itemStart + i] || '';
     if(!raw || !state[item.id]) return;
@@ -3809,7 +3832,8 @@ function loadStudentRow(row, tabName){
     }
   }
 
-  // Restore custom field values
+  // Restore custom field values — must render the bar first so the inputs exist in DOM
+  renderCustomFieldsBar();
   (config.customFields||[]).forEach((f, i)=>{
     const el = document.getElementById('cf_'+f.id);
     if(el) el.value = row[6+i] || '';
