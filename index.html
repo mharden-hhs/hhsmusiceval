@@ -3932,9 +3932,15 @@ function loadStudentRow(row, tabName){
 
   // Restore custom field values — render bar first so inputs exist in DOM
   renderCustomFieldsBar();
+  console.log('[loadStudentRow] rosterHeader:', rosterHeader);
+  console.log('[loadStudentRow] row:', row);
+  console.log('[loadStudentRow] templateColOffset:', templateColOffset, '| storedTemplateName:', storedTemplateName);
+  console.log('[loadStudentRow] customCount:', customCount, '| itemStart:', itemStart, '| all.length:', all.length);
   (config.customFields||[]).forEach((f, i)=>{
+    const colIdx = 6 + templateColOffset + i;
+    console.log(`[loadStudentRow] customField[${i}] "${f.label}" <- row[${colIdx}] = "${row[colIdx]}"`);
     const el = document.getElementById('cf_'+f.id);
-    if(el) el.value = row[6 + templateColOffset + i] || '';
+    if(el) el.value = row[colIdx] || '';
   });
 
   // Comments are the last column; Avg Score is second-to-last — skip it
