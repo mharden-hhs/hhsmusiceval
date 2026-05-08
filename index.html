@@ -3797,11 +3797,25 @@ function loadStudentRow(row, tabName){
     if(found){ selectedStudent=found; applyStudentChip(); }
   }
 
-  // Column layout: Name(0) Email(1) Class(2) Grade(3) Date(4) Teacher(5) Template(6) [customFields...] [items...] Avg Comments
-  // Detect whether this row has the Template column by checking rosterHeader
-  const hasTemplateCol = rosterHeader.length > 0 && rosterHeader[6] === 'Template';
-  const templateColOffset = hasTemplateCol ? 1 : 0; // older rows without Template column
-  const storedTemplateName = hasTemplateCol ? (row[6] || '') : '';
+  // Column layout detection — new rows have Template column at position 6
+  // Old rows (saved before Template column was added) do not have it
+  // We detect by checking rosterHeader AND by verifying the row value at col 6
+  // is a known template name (not a custom field value like a song title)
+  const headerHasTemplateCol = rosterHeader.length > 6 && rosterHeader[6] === 'Template';
+  let templateColOffset = 0;
+  let storedTemplateName = '';
+  if(headerHasTemplateCol){
+    const col6Val = row[6] || '';
+    const tplsCheck = getTemplates();
+    // If col6 matches a known template name, it's the Template column
+    // If not, this row was saved before the Template column existed
+    const col6IsTemplate = col6Val === '' ||
+      tplsCheck.some(t => t.name.toLowerCase() === col6Val.toLowerCase());
+    if(col6IsTemplate){
+      templateColOffset = 1;
+      storedTemplateName = col6Val;
+    }
+  }
 
   let customCount = (config.customFields||[]).length;
   let itemStart   = 6 + templateColOffset + customCount;
