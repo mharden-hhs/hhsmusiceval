@@ -3797,24 +3797,26 @@ function loadStudentRow(row, tabName){
     if(found){ selectedStudent=found; applyStudentChip(); }
   }
 
-  // Column layout detection — new rows have Template column at position 6
-  // Old rows (saved before Template column was added) do not have it
-  // We detect by checking rosterHeader AND by verifying the row value at col 6
-  // is a known template name (not a custom field value like a song title)
+  // Column layout detection
+  // The header always reflects the current format (with Template col at [6])
+  // But rows saved before the Template column was added are 1 column shorter
+  // We detect by comparing row length against what we'd expect with vs without the Template col
   const headerHasTemplateCol = rosterHeader.length > 6 && rosterHeader[6] === 'Template';
   let templateColOffset = 0;
   let storedTemplateName = '';
+
   if(headerHasTemplateCol){
-    const col6Val = row[6] || '';
-    const tplsCheck = getTemplates();
-    // If col6 matches a known template name, it's the Template column
-    // If not, this row was saved before the Template column existed
-    const col6IsTemplate = col6Val === '' ||
-      tplsCheck.some(t => t.name.toLowerCase() === col6Val.toLowerCase());
-    if(col6IsTemplate){
+    const headerLen = rosterHeader.length;
+    const rowLen = row.length;
+    // A row saved WITH the Template column should be within 1 of the header length
+    // (Sheets API may trim trailing empty cells, so allow -1 tolerance)
+    // A row saved WITHOUT it will be noticeably shorter (headerLen - 1 items = 2+ shorter)
+    const rowHasTemplateCol = rowLen >= headerLen - 1;
+    if(rowHasTemplateCol){
       templateColOffset = 1;
-      storedTemplateName = col6Val;
+      storedTemplateName = row[6] || '';
     }
+    // else: old format row, templateColOffset stays 0
   }
 
   let customCount = (config.customFields||[]).length;
@@ -3934,7 +3936,7 @@ function loadStudentRow(row, tabName){
   renderCustomFieldsBar();
   console.log('[loadStudentRow] rosterHeader:', rosterHeader);
   console.log('[loadStudentRow] row:', row);
-  console.log('[loadStudentRow] templateColOffset:', templateColOffset, '| storedTemplateName:', storedTemplateName);
+  console.log(`[loadStudentRow] headerLen:${rosterHeader.length} rowLen:${row.length} templateColOffset:${templateColOffset} storedTemplateName:"${storedTemplateName}"`);
   console.log('[loadStudentRow] customCount:', customCount, '| itemStart:', itemStart, '| all.length:', all.length);
   (config.customFields||[]).forEach((f, i)=>{
     const colIdx = 6 + templateColOffset + i;
