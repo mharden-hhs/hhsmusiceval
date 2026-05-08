@@ -3441,37 +3441,89 @@ async function findStudentRow(spreadsheetId, tabName, email, cls){
 
 /* ── Core upsert: update existing row or append new one ──────── */
 async function upsertStudentRow(spreadsheetId, tabName){
-  const row    = buildSharedRow();
-  const header = buildSharedHeader();
-  const email  = row[1]; // col B
-  const cls    = row[2]; // col C — disambiguates multi-course students
+  const newHeader = buildSharedHeader();
+  const newRow    = buildSharedRow();
+  const email     = newRow[1];
+  const cls       = newRow[2];
 
-  // Always overwrite row 1 with the current header so it stays in sync with
-  // the active template — even if the tab was created with a different template
-  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(tabName+'!A1')}?valueInputOption=USER_ENTERED`,{
-    method:'PUT',
-    headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-    body: JSON.stringify({range:`${tabName}!A1`,majorDimension:'ROWS',values:[header]})
+  // Fetch existing header
+  let existingHeader = [];
+  try{
+    const hr = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(tabName+'!1:1')}`,
+      {headers:{Authorization:'Bearer '+accessToken}}
+    );
+    const hd = await hr.json();
+    existingHeader = (hd.values && hd.values[0]) || [];
+  }catch(e){}
+
+  // If no existing header, write fresh and append
+  if(!existingHeader.length){
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(tabName+'!A1')}?valueInputOption=USER_ENTERED`,{
+      method:'PUT', headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+      body: JSON.stringify({range:`${tabName}!A1`,majorDimension:'ROWS',values:[newHeader]})
+    });
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(tabName+'!A1')}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,{
+      method:'POST', headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+      body: JSON.stringify({majorDimension:'ROWS',values:[newRow]})
+    });
+    return 'appended';
+  }
+
+  // Terminal columns that must always be last and never duplicated
+  const TERMINAL = ['avg score','overall comments'];
+
+  // Build merged header:
+  // 1. Strip terminals from existing, deduplicate
+  const seenCols = new Set();
+  const dedupedCore = existingHeader
+    .filter(h => !TERMINAL.includes((h||'').toLowerCase().trim()))
+    .filter(h => {
+      const k = (h||'').toLowerCase().trim();
+      if(!k || seenCols.has(k)) return false;
+      seenCols.add(k); return true;
+    });
+
+  // 2. Add any new columns from newHeader (excluding terminals)
+  newHeader
+    .filter(h => !TERMINAL.includes((h||'').toLowerCase().trim()))
+    .forEach(col => {
+      const k = (col||'').toLowerCase().trim();
+      if(k && !seenCols.has(k)){ seenCols.add(k); dedupedCore.push(col); }
+    });
+
+  // 3. Terminals always last, exactly once
+  const mergedHeader = [...dedupedCore, 'Avg Score', 'Overall Comments'];
+
+  // Map new row values into merged header by column name
+  const mergedRow = new Array(mergedHeader.length).fill('');
+  newHeader.forEach((col, newIdx) => {
+    const k = (col||'').toLowerCase().trim();
+    const mergedIdx = TERMINAL.includes(k)
+      ? mergedHeader.map(h=>(h||'').toLowerCase().trim()).lastIndexOf(k)
+      : mergedHeader.findIndex(h => (h||'').toLowerCase().trim() === k);
+    if(mergedIdx >= 0) mergedRow[mergedIdx] = newRow[newIdx] || '';
   });
 
-  const existingRow = await findStudentRow(spreadsheetId, tabName, email, cls);
+  // Write corrected header (also fixes duplicates already in sheet)
+  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(tabName+'!A1')}?valueInputOption=USER_ENTERED`,{
+    method:'PUT', headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+    body: JSON.stringify({range:`${tabName}!A1`,majorDimension:'ROWS',values:[mergedHeader]})
+  });
 
-  if(existingRow > 0){
-    // Update existing row
-    const range = `${tabName}!A${existingRow}`;
+  // Update or append student row
+  const existingRowIdx = await findStudentRow(spreadsheetId, tabName, email, cls);
+  if(existingRowIdx > 0){
+    const range = `${tabName}!A${existingRowIdx}`;
     await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,{
-      method:'PUT',
-      headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-      body: JSON.stringify({range,majorDimension:'ROWS',values:[row]})
+      method:'PUT', headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+      body: JSON.stringify({range,majorDimension:'ROWS',values:[mergedRow]})
     });
     return 'updated';
   } else {
-    // Append new row
-    const range = `${tabName}!A1`;
-    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,{
-      method:'POST',
-      headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-      body: JSON.stringify({majorDimension:'ROWS',values:[row]})
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(tabName+'!A1')}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,{
+      method:'POST', headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+      body: JSON.stringify({majorDimension:'ROWS',values:[mergedRow]})
     });
     return 'appended';
   }
