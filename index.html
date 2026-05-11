@@ -2082,11 +2082,18 @@ function populateRosterSelectors(){
   clsSel.innerHTML = '<option value="">Select class…</option>' +
     classes.map(c=>`<option value="${esc(c)}" ${c===prevCls?'selected':''}>${esc(c)}</option>`).join('');
 
-  // Assessment dropdown — known tab names from shared sheet
+  // Assessment dropdown — filter to current teacher's tabs
+  // Tab names are "Assessment Name - TeacherName"; show all if no teacher selected
   const assSel = document.getElementById('rosterAssessSelect');
   const prevAss = assSel.value;
+  const currentTeacher = getFormMeta().teacherName || '';
+  const visibleTabs = knownAssessmentNames.filter(n => {
+    if(!currentTeacher) return true; // no teacher selected — show all
+    const suffix = ' - ' + currentTeacher;
+    return n.endsWith(suffix) || !n.includes(' - '); // teacher's tabs + legacy unsuffixed tabs
+  });
   assSel.innerHTML = '<option value="">Select assessment…</option>' +
-    knownAssessmentNames.map(n=>`<option value="${esc(n)}" ${n===prevAss?'selected':''}>${esc(n)}</option>`).join('');
+    visibleTabs.map(n=>`<option value="${esc(n)}" ${n===prevAss?'selected':''}>${esc(n)}</option>`).join('');
 
   // Pre-select from current form if nothing already chosen
   if(!clsSel.value){
@@ -2094,15 +2101,21 @@ function populateRosterSelectors(){
     if(cls) clsSel.value = cls;
   }
   if(!assSel.value){
-    const ass = getAssessmentName();
-    if(ass) assSel.value = ass;
+    // Try matching the full sheet tab name for current teacher
+    const sheetTab = getSheetTabName();
+    const assessName = getAssessmentName();
+    if(sheetTab && assSel.querySelector(`option[value="${CSS.escape(sheetTab)}"]`)){
+      assSel.value = sheetTab;
+    } else if(assessName){
+      // Fallback: match by assessment name portion
+      const match = visibleTabs.find(t => t === assessName || t.startsWith(assessName + ' - '));
+      if(match) assSel.value = match;
+    }
   }
 
   const newCls  = clsSel.value;
   const newAss  = assSel.value;
 
-  // Always reload if both are set — handles the case where names arrived
-  // asynchronously after the sidebar was already open
   if(newCls && newAss){
     const changed = newCls !== rosterClass || newAss !== rosterAssessment;
     rosterClass      = newCls;
@@ -3282,6 +3295,16 @@ function getAssessmentName(){
   return (document.getElementById('assessmentName')||{}).value?.trim() || '';
 }
 
+// Tab name used in the sheet — appends teacher name so each teacher gets their own tab
+// e.g. "Final Assessment 2026 - Harden"
+// This keeps different teachers' templates from colliding in the same tab
+function getSheetTabName(){
+  const assessment = getAssessmentName();
+  if(!assessment) return '';
+  const teacher = getFormMeta().teacherName || '';
+  return teacher ? `${assessment} - ${teacher}` : assessment;
+}
+
 function getSharedSheetId(){
   return (config.driveSettings.trackingSheetId||'').trim() ||
          ls.get('tracking_sheet_id')||'';
@@ -3564,9 +3587,8 @@ async function saveToSharedSheet(silent=false){
     if(!silent) toast('Not signed in to Google','fas fa-triangle-exclamation','#e74c3c');
     return false;
   }
-  const tabName = getAssessmentName();
+  const tabName = getSheetTabName();
   if(!tabName){
-    // No assessment name — show the prompt modal instead of silently failing
     promptAssessmentName();
     return false;
   }
@@ -3720,7 +3742,8 @@ async function backgroundSync(){
 }
 
 /* ── Assessment name suggestions (from sheet tabs) ───────────── */
-let knownAssessmentNames = [];
+let knownAssessmentNames        = []; // full tab names including teacher suffix
+let knownAssessmentNamesDisplay = []; // stripped names for the assessment input dropdown
 async function fetchAssessmentNames(){
   const sharedId = getSharedSheetId();
   if(!sharedId||!accessToken) return;
@@ -3730,10 +3753,26 @@ async function fetchAssessmentNames(){
     });
     const data = await r.json();
     const SYSTEM_TABS = new Set(['USERS','Config','CONFIG','_TEMPLATES','Sheet1','Sheet2','Sheet3']);
-    knownAssessmentNames = (data.sheets||[])
+    const allTabs = (data.sheets||[])
       .map(s=>s.properties.title)
       .filter(t=> !SYSTEM_TABS.has(t) && !t.startsWith('_'));
-    // Update roster assessment dropdown if sidebar is open
+
+    // Store full tab names for roster (teacher-suffixed)
+    knownAssessmentNames = allTabs;
+
+    // For the assessment name input dropdown, strip teacher suffix so teachers
+    // type "Final Assessment 2026" not "Final Assessment 2026 - Harden"
+    // Tab format: "Assessment Name - TeacherName"
+    knownAssessmentNamesDisplay = [...new Set(allTabs.map(t => {
+      // Strip known teacher names from the end
+      const teacherNames = (config.teachers||[]);
+      for(const teacher of teacherNames){
+        const suffix = ' - ' + teacher;
+        if(t.endsWith(suffix)) return t.slice(0, -suffix.length);
+      }
+      return t; // no suffix found, return as-is (legacy tab or no teacher set)
+    }))];
+
     if(rosterOpen) populateRosterSelectors();
   }catch(e){}
 }
@@ -3742,7 +3781,8 @@ function showAssessmentNameSuggestions(){
   const inp = document.getElementById('assessmentName');
   if(!dd||!inp) return;
   const q = inp.value.toLowerCase();
-  const matches = knownAssessmentNames.filter(n=>!q||n.toLowerCase().includes(q));
+  const names = knownAssessmentNamesDisplay.length ? knownAssessmentNamesDisplay : knownAssessmentNames;
+  const matches = names.filter(n=>!q||n.toLowerCase().includes(q));
   if(!matches.length){ dd.style.display='none'; return; }
   dd.innerHTML = matches.map(n=>`
     <div onclick="document.getElementById('assessmentName').value='${n.replace(/'/g,"\\'")}';hideAssessmentNameSuggestions();autoSave();"
