@@ -420,14 +420,14 @@ body{background:var(--light);font-family:'Lato',sans-serif;margin:0;padding:0;}
   <label style="font-size:12px;font-weight:700;color:#555;margin:0;white-space:nowrap;">Assessment Name</label>
   <input type="text" id="assessmentName" placeholder="e.g. Term 1 Final, Semester 2 Mid-term..."
     style="font-size:13px;border:1px solid #ccc;border-radius:6px;padding:4px 10px;outline:none;width:280px;"
-    oninput="autoSave(); onFormAssessmentChange()"
+    oninput="autoSave(); onFormAssessmentChange(); updateSharedSheetBadge();"
     onfocus="showAssessmentNameSuggestions()"
     onblur="setTimeout(hideAssessmentNameSuggestions,200)"
   />
   <div style="position:relative;display:inline-block;">
     <div id="assessmentNameDropdown" style="display:none;position:absolute;top:4px;left:0;background:white;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:200;min-width:240px;overflow:hidden;"></div>
   </div>
-  <span style="font-size:11px;color:#aaa;">Each unique name creates a separate tab in the shared sheet.</span>
+  <span id="sheetTabHint" style="font-size:11px;color:#aaa;">Each unique name creates a separate tab in the shared sheet.</span>
   <span id="sharedSheetBadge" style="display:none;font-size:11px;background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7;border-radius:10px;padding:2px 9px;margin-left:4px;">
     <i class="fas fa-table" style="font-size:9px;margin-right:3px;"></i>Shared sheet active
   </span>
@@ -1318,7 +1318,7 @@ function renderStudentBar(){
     // Teacher field — dropdown from config.teachers list
     if(f.id === 'teacherName'){
       const opts = (config.teachers||[]).map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
-      const input = `<select id="teacherName" onchange="autoSave()" style="width:${f.width||'140px'}"><option value="">Select teacher...</option>${opts}</select>`;
+      const input = `<select id="teacherName" onchange="autoSave();updateSharedSheetBadge();" style="width:${f.width||'140px'}"><option value="">Select teacher...</option>${opts}</select>`;
       return `<label><i class="fas fa-chalkboard-teacher" style="color:#bbb;margin-right:4px;font-size:11px;"></i>${esc(f.label)}</label>${input}`;
     }
     // Class field — populated from USERS data if available, otherwise config.classes
@@ -3378,6 +3378,22 @@ async function fetchUserInfo(silent=false){
 function updateSharedSheetBadge(){
   const badge = document.getElementById('sharedSheetBadge');
   if(badge) badge.style.display = getSharedSheetId() ? 'inline-flex' : 'none';
+  // Show the actual tab name that will be written to
+  const hint = document.getElementById('sheetTabHint');
+  if(hint){
+    const tabName = getSheetTabName();
+    const teacher = getFormMeta().teacherName || '';
+    if(tabName && teacher){
+      hint.innerHTML = `→ saves to tab <strong style="color:#1a73e8;">${esc(tabName)}</strong>`;
+      hint.style.color = '#555';
+    } else if(tabName && !teacher){
+      hint.innerHTML = `→ tab will be <strong>${esc(tabName)}</strong> — <span style="color:#e67e22;">select a teacher to namespace by teacher</span>`;
+      hint.style.color = '#555';
+    } else {
+      hint.textContent = 'Each unique name creates a separate tab in the shared sheet.';
+      hint.style.color = '#aaa';
+    }
+  }
 }
 
 function setSignedIn(name,email){
@@ -3755,6 +3771,12 @@ async function saveToSharedSheet(silent=false){
   const tabName = getSheetTabName();
   if(!tabName){
     promptAssessmentName();
+    return false;
+  }
+  // Require teacher — without it the tab name has no suffix and may collide
+  const teacher = getFormMeta().teacherName || '';
+  if(!teacher){
+    if(!silent) toast('Please select a teacher before saving','fas fa-user-tie','#f39c12');
     return false;
   }
 
